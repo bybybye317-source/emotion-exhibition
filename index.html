@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="机器如何理解人类的情绪：视觉、听觉与嗅觉模拟，三种感官随群体表情变化。可在浏览器内体验，照片不上传。">
+  <title>群体肖像 · 机器如何理解人类的情绪</title>
+  <link rel="stylesheet" href="./static/style.css">
+  <script type="importmap">{"imports":{"three":"./static/vendor/three/three.module.js","three/addons/":"./static/vendor/three/addons/"}}</script>
+  <script type="module" src="./static/app.js"></script>
+  <script type="module" src="./static/portrait.js"></script>
+  <script type="module" src="./static/music.js"></script>
+  <script type="module" src="./static/scent.js"></script>
+</head>
+<body>
+  <svg class="svg-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="icon-camera" viewBox="0 0 24 24"><path d="M4 7h3l1.5-3h7L17 7h3a2 2 0 0 1 2 2v11H2V9a2 2 0 0 1 2-2Z"/><circle cx="12" cy="13" r="4"/></symbol>
+    <symbol id="icon-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></symbol>
+    <symbol id="icon-stop" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/></symbol>
+    <symbol id="icon-trash" viewBox="0 0 24 24"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></symbol>
+    <symbol id="icon-record" viewBox="0 0 24 24"><path d="M14 2H5v20h14V7l-5-5Zm0 0v6h5M8 12h8M8 16h6"/></symbol>
+    <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M5 20v-6M12 20V8M19 20V3"/></symbol>
+    <symbol id="icon-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v.5"/></symbol>
+    <symbol id="icon-reset-view" viewBox="0 0 24 24"><path d="M19.6 7A8 8 0 1 0 20 16M20 3v5h-5"/></symbol>
+    <symbol id="icon-play" viewBox="0 0 24 24"><path d="m8 4 12 8-12 8Z"/></symbol>
+    <symbol id="icon-fullscreen" viewBox="0 0 24 24"><path d="M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5M3 3l6 6M21 3l-6 6M3 21l6-6M21 21l-6-6"/></symbol>
+    <symbol id="icon-pointer" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="6"/><path d="M12 2v6"/></symbol>
+    <symbol id="icon-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  </svg>
+
+  <main class="app-shell">
+    <header class="page-header">
+      <div class="identity"><h1 id="page-title">群体肖像</h1><p class="project-title">机器如何理解人类的情绪</p></div>
+      <nav class="view-tabs" role="tablist" aria-label="三感官体验与参与">
+        <button id="nav-portrait" class="view-tab" type="button" role="tab" aria-selected="true" aria-controls="portrait-panel">视觉</button>
+        <button id="nav-music" class="view-tab" type="button" role="tab" aria-selected="false" aria-controls="music-panel" tabindex="-1">听觉</button>
+        <button id="nav-scent" class="view-tab" type="button" role="tab" aria-selected="false" aria-controls="scent-panel" tabindex="-1">嗅觉</button>
+        <button id="nav-capture" class="view-tab" type="button" role="tab" aria-selected="false" aria-controls="capture-panel" tabindex="-1">参与作品</button>
+      </nav>
+      <div id="connection" class="connection" role="status"><span class="status-dot"></span><span id="connection-text">正在连接</span></div>
+    </header>
+
+
+    <section class="web-intro" aria-label="在线体验说明"><p><strong>一种情绪，三种感官。</strong>先选择情绪体验，也可以用摄像头或照片加入自己的群体作品。</p><p class="web-privacy">照片和表情分析仅在你的浏览器内处理，不上传；本轮记录刷新后清空，不与其他访客共享。首次启用识别需要下载模型。</p>      <details class="artwork-preview-details" open>
+        <summary><span>联动预览</span><svg class="icon" aria-hidden="true"><use href="#icon-chevron"></use></svg></summary>
+        <div class="artwork-preview-body">
+          <label for="artwork-preview">情绪联动预览</label>
+          <select id="artwork-preview">
+            <option value="group">跟随群体</option>
+            <option value="neutral">中性</option>
+            <option value="happiness">快乐</option>
+            <option value="sadness">悲伤</option>
+            <option value="surprise">惊讶</option>
+            <option value="anger">愤怒</option>
+            <option value="fear">恐惧</option>
+            <option value="disgust">厌恶</option>
+            <option value="contempt">轻蔑</option>
+          </select>
+          <p>每种情绪试听 30–60 秒，感受声音逐渐变形；预览不写入观众记录。</p>
+        </div>
+      </details>
+    </section>
+
+    <div id="action-error" class="message error" role="alert" hidden></div>
+
+    <section id="music-panel" class="music-panel" role="tabpanel" aria-labelledby="nav-music" hidden>
+      <div class="music-main">
+        <div class="music-identity">
+          <div class="music-heading"><h2 id="music-title">群体声景</h2><span id="music-status" class="music-status" role="status">尚未开启</span></div>
+          <p id="music-source" class="music-source">等待观众 · 待机声景</p>
+          <p class="music-character"><span id="music-sample-status">本地管弦采样 · 点击后载入</span><span>力度 <output id="music-dynamics-value">—</output></span><span>厚度 <output id="music-orchestration-value">—</output></span></p>
+        </div>
+        <div class="music-layers" aria-label="六个声部的配比">
+          <div class="music-layer"><span>弦乐</span><div class="music-layer-track"><span id="music-strings-fill" class="music-layer-fill"></span></div></div>
+          <div class="music-layer"><span>铜管</span><div class="music-layer-track"><span id="music-brass-fill" class="music-layer-fill"></span></div></div>
+          <div class="music-layer"><span>合成器</span><div class="music-layer-track"><span id="music-synth-fill" class="music-layer-fill"></span></div></div>
+          <div class="music-layer"><span>低音</span><div class="music-layer-track"><span id="music-bass-fill" class="music-layer-fill"></span></div></div>
+          <div class="music-layer"><span>微光</span><div class="music-layer-track"><span id="music-melody-fill" class="music-layer-fill"></span></div></div>
+          <div class="music-layer"><span>打击</span><div class="music-layer-track"><span id="music-percussion-fill" class="music-layer-fill"></span></div></div>
+        </div>
+        <div class="music-controls">
+          <button id="music-toggle" class="button primary music-toggle" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#icon-play"></use></svg><span id="music-toggle-label">开启声音</span></button>
+          <div class="music-volume-control"><label for="music-volume">音量</label><input id="music-volume" type="range" min="0" max="100" value="35"><output id="music-volume-value" for="music-volume">35%</output></div>
+        </div>
+      </div>
+      <div class="music-texture" aria-label="随情绪变化的声音目标参数">
+        <span class="music-texture-title">宇宙织体</span>
+        <span title="弦乐碎片与短暂微光的出现密度">颗粒密度 <output id="music-texture-value">—</output></span>
+        <span title="音高、音色与声像的游移幅度">音色漂移 <output id="music-drift-value">—</output></span>
+        <span title="回声与远景混响的展开程度">空间延展 <output id="music-space-value">—</output></span>
+      </div>
+      <div class="music-notes"><p id="music-description">长音悬浮，弦乐化成碎片与倒放涌流，微光在远处消散。</p><p>脸、音乐和气味共用群体数据与联动预览。<a class="scent-panel-link" href="#scent-panel">查看气味模拟 <span aria-hidden="true">↓</span></a></p></div>
+
+      <div id="music-error" class="message error music-error" role="alert" hidden></div>
+    </section>
+
+    <section id="portrait-panel" class="view-panel" role="tabpanel" aria-labelledby="nav-portrait">
+      <h2 class="portrait-heading">每一张面孔，都成为这张脸的一部分</h2>
+      <div class="portrait-layout">
+        <div id="portrait-workspace" class="portrait-workspace">
+          <div id="portrait-stage" class="portrait-stage" aria-label="由观众照片组成的三维群体肖像" aria-describedby="portrait-controls-hint"></div>
+          <div class="portrait-toolbar">
+            <p id="portrait-controls-hint" class="portrait-controls-hint"><svg class="icon" aria-hidden="true"><use href="#icon-pointer"></use></svg><span>拖动旋转 · 滚轮缩放</span></p>
+            <div class="portrait-actions">
+              <button id="portrait-reset-view" class="button compact portrait-control" type="button"><svg class="icon" aria-hidden="true"><use href="#icon-reset-view"></use></svg><span>重置视角</span></button>
+              <button id="portrait-rotate" class="button compact portrait-control" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#icon-play"></use></svg><span>自动旋转</span></button>
+              <button id="portrait-fullscreen" class="button compact portrait-control" type="button"><svg class="icon" aria-hidden="true"><use href="#icon-fullscreen"></use></svg><span>全屏</span></button>
+            </div>
+          </div>
+        </div>
+        <aside class="portrait-rail" aria-label="作品状态">
+          <p id="portrait-count" class="portrait-count">0 位观众</p>
+          <h3 id="portrait-status" class="portrait-status" role="status">等待第一位观众</h3>
+          <p id="portrait-empty-hint" class="portrait-description">完成采集后，照片将拼贴到这张脸上。</p>
+          <section class="portrait-distribution" aria-labelledby="portrait-emotions-title">
+            <h3 id="portrait-emotions-title">群体表情</h3>
+            <div id="portrait-emotions" class="scores compact-scores"><p class="portrait-no-data">暂无数据<br><span>当有观众完成采集后，将分析并展示群体的表情倾向。</span></p></div>
+          </section>
+          <details class="portrait-preview-details">
+            <summary><span>联动预览</span><svg class="icon" aria-hidden="true"><use href="#icon-chevron"></use></svg></summary>
+            <div class="portrait-preview-body">
+              <label for="portrait-preview">预览脸、音乐和气味</label>
+              <select id="portrait-preview">
+                <option value="group">跟随群体</option>
+                <option value="neutral">中性</option>
+                <option value="happiness">快乐</option>
+                <option value="sadness">悲伤</option>
+                <option value="surprise">惊讶</option>
+                <option value="anger">愤怒</option>
+                <option value="fear">恐惧</option>
+                <option value="disgust">厌恶</option>
+                <option value="contempt">轻蔑</option>
+              </select>
+              <p>预览同时改变脸、音乐和气味，不写入观众记录。选择“跟随群体”恢复实时作品。</p>
+            </div>
+          </details>
+        </aside>
+      </div>
+    </section>
+
+    <section id="capture-panel" class="view-panel" role="tabpanel" aria-labelledby="nav-capture" hidden>
+    <div class="primary-grid">
+      <section class="camera-section" aria-label="摄像头采集">
+        <div class="preview">
+          <video id="camera-stream" class="camera-stream" aria-label="摄像头实时镜像预览" autoplay playsinline muted hidden></video>
+          <div id="camera-placeholder" class="camera-placeholder">
+            <svg class="icon camera-icon"><use href="#icon-camera"></use></svg>
+            <h2 id="camera-placeholder-title">摄像头尚未开启</h2>
+            <p id="camera-placeholder-detail">开启摄像头后，正对镜头开始采集</p>
+          </div>
+          <div id="preview-badge" class="preview-badge" hidden>等待有效人脸</div>
+        </div>
+        <div class="camera-actions">
+          <button id="start-camera" class="button primary" disabled><svg class="icon"><use href="#icon-camera"></use></svg><span>开启摄像头</span></button>
+          <button id="capture" class="button" disabled><svg class="icon"><use href="#icon-clock"></use></svg><span id="capture-label">采集 3 秒</span></button>
+          <button id="stop-camera" class="button subtle" disabled><svg class="icon"><use href="#icon-stop"></use></svg><span>停止摄像头</span></button>
+        </div>
+        <div class="camera-feedback">
+          <p id="capture-detail" role="status">开启摄像头后，采集一位观众的表情。</p>
+          <div id="capture-progress" class="capture-progress" role="progressbar" aria-label="采集进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><span id="capture-progress-fill"></span></div>
+        </div>
+      </section>
+
+      <section class="panel live-panel" aria-labelledby="live-title">
+        <div class="panel-header"><h2 id="live-title">实时表情倾向</h2><span id="top-emotion" class="top-emotion"></span></div>
+        <div id="live-scores" class="scores" aria-label="八类表情分数"></div>
+        <p id="live-detail" class="panel-note" role="status">等待开启摄像头</p>
+        <p id="performance" class="performance"></p>
+      </section>
+    </div>
+
+    <div class="session-grid">
+      <section class="panel records-panel" aria-labelledby="records-title">
+        <div class="panel-header"><div class="heading-with-count"><h2 id="records-title">本轮参与记录</h2><span id="participant-count" class="count">0 人</span></div><button id="reset-session" class="button compact subtle" disabled><svg class="icon"><use href="#icon-trash"></use></svg><span>清空本轮</span></button></div>
+        <div id="records-empty" class="empty-state"><svg class="icon empty-icon"><use href="#icon-record"></use></svg><p>完成一次采集后，记录会出现在这里</p></div>
+        <ol id="participant-list" class="participant-list" hidden></ol>
+      </section>
+      <section class="panel group-panel" aria-labelledby="group-title">
+        <div class="panel-header"><h2 id="group-title">群体分布</h2></div>
+        <div id="group-empty" class="empty-state"><svg class="icon empty-icon"><use href="#icon-chart"></use></svg><p>完成一次采集后，这里将显示群体的表情分布</p></div>
+        <div id="group-scores" class="scores compact-scores" aria-label="群体表情分数" hidden></div>
+      </section>
+    </div>
+
+    <details class="image-test">
+      <summary>用照片参与</summary>
+      <div class="image-test-body">
+        <p class="test-explanation">选择一张清晰正面人脸照片，在浏览器内分析。确认后点击“加入作品”，照片才会进入你的三维群体脸。</p>
+        <form id="image-test-form" class="image-test-form">
+          <label for="test-file">选择图片</label>
+          <input id="test-file" name="file" type="file" accept="image/jpeg,image/png,image/webp" required>
+          <button id="test-image" class="button compact" type="submit" disabled>分析图片</button>
+        </form>
+        <div id="image-test-result" hidden>
+          <p id="image-test-detail" role="status"></p>
+          <button id="add-image" class="button compact" type="button" disabled>将这张照片加入作品</button>
+          <div class="image-test-results"><img id="test-preview" alt="本地测试图片预览"><div id="image-scores" class="scores compact-scores" aria-label="图片测试表情分数"></div></div>
+        </div>
+      </div>
+    </details>
+    </section>
+
+    <section id="scent-panel" class="scent-panel" role="tabpanel" aria-labelledby="nav-scent" data-phase="idle" hidden>
+      <header class="scent-header">
+        <div class="scent-identity">
+          <div class="scent-heading"><h2 id="scent-title">群体气味</h2><span class="scent-simulation-badge">模拟输出 · 未连接气味设备</span></div>
+          <p id="scent-source" class="scent-source">等待观众</p>
+        </div>
+        <div class="scent-controls">
+          <button id="scent-toggle" class="button primary scent-toggle" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#icon-play"></use></svg><span id="scent-toggle-label">开启模拟</span></button>
+          <button id="scent-stop" class="button subtle scent-stop" type="button" disabled><svg class="icon" aria-hidden="true"><use href="#icon-stop"></use></svg><span>立即停止</span></button>
+        </div>
+      </header>
+
+      <div class="scent-layout">
+        <section class="scent-recipe" aria-labelledby="scent-recipe-heading">
+          <div class="scent-section-heading"><h3 id="scent-recipe-heading">气味配方</h3><span id="scent-recipe-code" class="scent-recipe-code">—</span></div>
+          <p id="scent-recipe-name" class="scent-recipe-name">暂无配方</p>
+          <div class="scent-channels" aria-label="四种基础气味的虚拟通道配比">
+            <div class="scent-channel" data-scent-channel="citrus"><div class="scent-channel-label"><span class="scent-channel-dot" aria-hidden="true"></span><span>柑橘</span></div><div class="scent-channel-track"><span id="scent-citrus-fill" class="scent-channel-fill"></span></div><span id="scent-citrus-ratio" class="scent-channel-ratio">0%</span><span id="scent-citrus-output" class="scent-channel-output">关闭</span></div>
+            <div class="scent-channel" data-scent-channel="floral"><div class="scent-channel-label"><span class="scent-channel-dot" aria-hidden="true"></span><span>花香</span></div><div class="scent-channel-track"><span id="scent-floral-fill" class="scent-channel-fill"></span></div><span id="scent-floral-ratio" class="scent-channel-ratio">0%</span><span id="scent-floral-output" class="scent-channel-output">关闭</span></div>
+            <div class="scent-channel" data-scent-channel="wood"><div class="scent-channel-label"><span class="scent-channel-dot" aria-hidden="true"></span><span>木质</span></div><div class="scent-channel-track"><span id="scent-wood-fill" class="scent-channel-fill"></span></div><span id="scent-wood-ratio" class="scent-channel-ratio">0%</span><span id="scent-wood-output" class="scent-channel-output">关闭</span></div>
+            <div class="scent-channel" data-scent-channel="herbal"><div class="scent-channel-label"><span class="scent-channel-dot" aria-hidden="true"></span><span>草本</span></div><div class="scent-channel-track"><span id="scent-herbal-fill" class="scent-channel-fill"></span></div><span id="scent-herbal-ratio" class="scent-channel-ratio">0%</span><span id="scent-herbal-output" class="scent-channel-output">关闭</span></div>
+          </div>
+          <p class="scent-recipe-note">比例为虚拟通道配比，不代表实际浓度。</p>
+          <p id="scent-pending" class="scent-pending" role="status" hidden></p>
+        </section>
+
+        <section class="scent-process" aria-labelledby="scent-process-title">
+          <div class="scent-section-heading"><h3 id="scent-process-title">释放过程</h3><span id="scent-status" class="scent-status" role="status">尚未开启</span></div>
+          <ol class="scent-phase-track" aria-label="模拟释放的四个阶段">
+            <li data-scent-phase="mixing"><span class="scent-phase-number" aria-hidden="true">01</span><span>调配</span></li>
+            <li data-scent-phase="releasing"><span class="scent-phase-number" aria-hidden="true">02</span><span>释放</span></li>
+            <li data-scent-phase="purging"><span class="scent-phase-number" aria-hidden="true">03</span><span>清味</span></li>
+            <li data-scent-phase="waiting"><span class="scent-phase-number" aria-hidden="true">04</span><span>等待</span></li>
+          </ol>
+          <div class="scent-progress-heading"><span>当前阶段</span><span id="scent-countdown" class="scent-countdown">—</span></div>
+          <div id="scent-progress" class="scent-progress" role="progressbar" aria-label="当前气味模拟阶段进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="scent-progress-fill"></span></div>
+          <p id="scent-detail" class="scent-detail">开启模拟后，查看气味配方如何随群体表情变化。</p>
+          <p class="scent-cycle-note">演示周期：调配 3 秒 · 释放 6 秒 · 清味 8 秒 · 等待 5 秒<br><span>仅用于展示流程，实际设备需另行标定。</span></p>
+        </section>
+      </div>
+
+      <details class="scent-history">
+        <summary><span>最近过程</span><svg class="icon" aria-hidden="true"><use href="#icon-chevron"></use></svg></summary>
+        <ol id="scent-log" class="scent-log" aria-label="最近的气味模拟过程" hidden></ol>
+      </details>
+    </section>
+
+    <footer class="page-footer">
+      <p><svg class="icon"><use href="#icon-info"></use></svg><span>模型推断表情倾向，不等同于真实内心感受</span></p>
+      <p id="model-status" class="model-status">浏览器内推理 · 点击后加载</p>
+      <p><a href="https://github.com/bybybye317-source/emotion-exhibition" target="_blank" rel="noopener noreferrer">GitHub 项目</a> · <a href="./THIRD_PARTY_NOTICES.md">素材与依赖说明</a></p>
+    </footer>
+  </main>
+</body>
+</html>

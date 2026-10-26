@@ -1,0 +1,311 @@
+{
+  "sampleCount": 38,
+  "totalBytes": 38033512,
+  "method": "SHA256; stereo PCM decode; valid 2+ second loop; seam equals adjacent source step; pitched harmonic energy; finite samples; peak < 0.851",
+  "samples": [
+    {
+      "id": "violin-62-soft",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.985833,
+      "rms": 0.0999969,
+      "peak": 0.414917
+    },
+    {
+      "id": "violin-62-strong",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.984494,
+      "rms": 0.1399957,
+      "peak": 0.4921265
+    },
+    {
+      "id": "violin-66-soft",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.992469,
+      "rms": 0.0999969,
+      "peak": 0.3807678
+    },
+    {
+      "id": "violin-66-strong",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.989446,
+      "rms": 0.1399957,
+      "peak": 0.7022705
+    },
+    {
+      "id": "violin-69-soft",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.987144,
+      "rms": 0.0999969,
+      "peak": 0.4254761
+    },
+    {
+      "id": "violin-69-strong",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.977225,
+      "rms": 0.1399957,
+      "peak": 0.5726013
+    },
+    {
+      "id": "violin-72-soft",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.996897,
+      "rms": 0.0999969,
+      "peak": 0.3242188
+    },
+    {
+      "id": "violin-72-strong",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.993347,
+      "rms": 0.1399957,
+      "peak": 0.5608521
+    },
+    {
+      "id": "violin-76-soft",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.975561,
+      "rms": 0.099997,
+      "peak": 0.4094238
+    },
+    {
+      "id": "violin-76-strong",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.970104,
+      "rms": 0.1399957,
+      "peak": 0.6482544
+    },
+    {
+      "id": "violin-79-soft",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.992457,
+      "rms": 0.099997,
+      "peak": 0.5602112
+    },
+    {
+      "id": "violin-79-strong",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.993086,
+      "rms": 0.1399957,
+      "peak": 0.5684204
+    },
+    {
+      "id": "cello-47-soft",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.992144,
+      "rms": 0.0999969,
+      "peak": 0.3959045
+    },
+    {
+      "id": "cello-47-strong",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.990763,
+      "rms": 0.1399957,
+      "peak": 0.584198
+    },
+    {
+      "id": "cello-50-soft",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.99139,
+      "rms": 0.0999969,
+      "peak": 0.3540344
+    },
+    {
+      "id": "cello-50-strong",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.949214,
+      "rms": 0.1399957,
+      "peak": 0.6046753
+    },
+    {
+      "id": "cello-53-soft",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.978207,
+      "rms": 0.099997,
+      "peak": 0.4565125
+    },
+    {
+      "id": "cello-53-strong",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.974041,
+      "rms": 0.1399957,
+      "peak": 0.6526489
+    },
+    {
+      "id": "cello-57-soft",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.981213,
+      "rms": 0.0999969,
+      "peak": 0.43396
+    },
+    {
+      "id": "cello-57-strong",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.971689,
+      "rms": 0.1399957,
+      "peak": 0.6051941
+    },
+    {
+      "id": "cello-60-soft",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.989206,
+      "rms": 0.099997,
+      "peak": 0.4127502
+    },
+    {
+      "id": "cello-60-strong",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.933643,
+      "rms": 0.1399957,
+      "peak": 0.6473389
+    },
+    {
+      "id": "horn-46-soft",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.998661,
+      "rms": 0.099997,
+      "peak": 0.8492126
+    },
+    {
+      "id": "horn-46-strong",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.999184,
+      "rms": 0.1399957,
+      "peak": 0.5146484
+    },
+    {
+      "id": "horn-50-soft",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.998423,
+      "rms": 0.099997,
+      "peak": 0.45224
+    },
+    {
+      "id": "horn-50-strong",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.99925,
+      "rms": 0.1399957,
+      "peak": 0.5106812
+    },
+    {
+      "id": "horn-53-soft",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.999461,
+      "rms": 0.0999969,
+      "peak": 0.5780945
+    },
+    {
+      "id": "horn-53-strong",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.999726,
+      "rms": 0.1399957,
+      "peak": 0.3769531
+    },
+    {
+      "id": "horn-57-soft",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.999471,
+      "rms": 0.099997,
+      "peak": 0.5119629
+    },
+    {
+      "id": "horn-57-strong",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.9994,
+      "rms": 0.1399957,
+      "peak": 0.5411072
+    },
+    {
+      "id": "horn-60-soft",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.999698,
+      "rms": 0.0999969,
+      "peak": 0.4708862
+    },
+    {
+      "id": "horn-60-strong",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.999874,
+      "rms": 0.1399957,
+      "peak": 0.2837524
+    },
+    {
+      "id": "trombone-50-soft",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.975494,
+      "rms": 0.0999969,
+      "peak": 0.3981018
+    },
+    {
+      "id": "trombone-50-strong",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.999022,
+      "rms": 0.1399957,
+      "peak": 0.51474
+    },
+    {
+      "id": "trombone-53-soft",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.982418,
+      "rms": 0.099997,
+      "peak": 0.3483276
+    },
+    {
+      "id": "trombone-53-strong",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.998322,
+      "rms": 0.1399957,
+      "peak": 0.5256958
+    },
+    {
+      "id": "trombone-60-soft",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.994094,
+      "rms": 0.099997,
+      "peak": 0.3460999
+    },
+    {
+      "id": "trombone-60-strong",
+      "sha256Verified": true,
+      "loopSeamVerified": true,
+      "harmonicEnergyFraction": 0.998933,
+      "rms": 0.1399958,
+      "peak": 0.6078491
+    }
+  ]
+}

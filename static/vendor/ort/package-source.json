@@ -1,0 +1,18 @@
+{
+  "package": "onnxruntime-web",
+  "version": "1.22.0",
+  "license": "MIT",
+  "dist": {
+    "shasum": "ad9b16d535bc4f4a51e325723e0d1a7f422c39be",
+    "tarball": "https://registry.npmjs.org/onnxruntime-web/-/onnxruntime-web-1.22.0.tgz",
+    "fileCount": 495,
+    "integrity": "sha512-Ud/+EBo6mhuaQWt/OjaOk0iNWjXqJoeeMFr6xQEERZdIZH2OWpGzuujz7lfuOBjUa6TEE/sc4nb7Da5dNL34fg==",
+    "signatures": [
+      {
+        "sig": "MEUCIQDn5KTO3y7XulRaXa8ZsqJuVwQ9u9aLg2VrJEtGj8Ms6AIgf+GIO7Ic/hQe1ES71vugtYabcSUg1D3kKSxS2e3e+Hs=",
+        "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+      }
+    ],
+    "unpackedSize": 93959024
+  }
+}

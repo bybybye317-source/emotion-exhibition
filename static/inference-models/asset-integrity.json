@@ -1,0 +1,90 @@
+{
+  "checked": "2026-10-26",
+  "assets": [
+    {
+      "path": "vendor/ort/LICENSE",
+      "bytes": 1073,
+      "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+    },
+    {
+      "path": "vendor/ort/ThirdPartyNotices.txt",
+      "bytes": 326866,
+      "sha256": "e9e90971a8e75a9a8ac0c6412e29c1202d079998389915aa485f46c816c3b4cc"
+    },
+    {
+      "path": "vendor/ort/ort-wasm-simd-threaded.mjs",
+      "bytes": 20856,
+      "sha256": "30dd851d9c00622940500f71ddd2ff8820c5cb65270816080175b958705385a8"
+    },
+    {
+      "path": "vendor/ort/ort-wasm-simd-threaded.wasm",
+      "bytes": 11210254,
+      "sha256": "71aef04959c5c1b6de461b6538e2058e306610034a85aad2742d0c7fd4533fe4"
+    },
+    {
+      "path": "vendor/ort/ort.wasm.min.mjs",
+      "bytes": 48259,
+      "sha256": "6ef726f355b791129f7ddf3f62e7877a16b9b777abe87004b8ab306e6b9cf265"
+    },
+    {
+      "path": "vendor/ort/package-source.json",
+      "bytes": 637,
+      "sha256": "ea9f052ef5e492c11c9ce07c947a1ac277a67a8a106b74668171e2042178c151"
+    },
+    {
+      "path": "vendor/mediapipe/LICENSE",
+      "bytes": 12331,
+      "sha256": "8707eef0533987efc5b155d64761eeb6e20793f50b9bd1a68dad1cf4719d0ed8"
+    },
+    {
+      "path": "vendor/mediapipe/package-source.json",
+      "bytes": 658,
+      "sha256": "746b09f9113ca75b32be592bd112a74cbbde66009582b29652cb3e99e582e6d0"
+    },
+    {
+      "path": "vendor/mediapipe/vision_bundle.mjs",
+      "bytes": 137735,
+      "sha256": "40f4123dfcd75cfa58add046919cc6f52fde66f009ff582997c09ba54c6ba27c"
+    },
+    {
+      "path": "vendor/mediapipe/wasm/vision_wasm_internal.js",
+      "bytes": 204284,
+      "sha256": "4a97e2520ba506c680ecd6ba6acfb146888afa0e2746d57f205352bc6ebb82eb"
+    },
+    {
+      "path": "vendor/mediapipe/wasm/vision_wasm_internal.wasm",
+      "bytes": 9574032,
+      "sha256": "f00ec4731faa23b3e714d00e88d4d10e2df5c0a427d3a2b4ae6e3526fdd14ef7"
+    },
+    {
+      "path": "vendor/mediapipe/wasm/vision_wasm_nosimd_internal.js",
+      "bytes": 204137,
+      "sha256": "927def7b465c51b86e4b3060f93646aca4e27121f4b8fc0483786e407ea9cf1f"
+    },
+    {
+      "path": "vendor/mediapipe/wasm/vision_wasm_nosimd_internal.wasm",
+      "bytes": 9448638,
+      "sha256": "3821ea9b1f7fb8c549ef2a064ef5c85750bf375c545a49fd6eea0df44a95f1f4"
+    },
+    {
+      "path": "inference-models/LICENSE-EMOTIEFFLIB-CODE",
+      "bytes": 11357,
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "path": "inference-models/LICENSE-MEDIAPIPE",
+      "bytes": 12331,
+      "sha256": "8707eef0533987efc5b155d64761eeb6e20793f50b9bd1a68dad1cf4719d0ed8"
+    },
+    {
+      "path": "inference-models/SOURCES.md",
+      "bytes": 4817,
+      "sha256": "a4b7021a72968c36a8782be134f951447dc8ac1247bc801ffcb98dafe444f821"
+    },
+    {
+      "path": "inference-models/face_landmarker.task",
+      "bytes": 3758596,
+      "sha256": "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff"
+    }
+  ]
+}

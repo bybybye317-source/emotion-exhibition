@@ -3,6 +3,7 @@ export const MUSIC_BPM = 84;
 export const BEAT_SECONDS = 60 / MUSIC_BPM;
 export const BAR_SECONDS = 4 * BEAT_SECONDS;
 export const MUSIC_LAYERS = ['strings', 'brass', 'synth', 'bass', 'melody', 'percussion'];
+export const MUSIC_CHARACTERS = ['joy', 'sorrow', 'rage', 'dread'];
 export const EMOTIONS = ['happiness', 'neutral', 'sadness', 'surprise', 'anger', 'fear', 'disgust', 'contempt'];
 const clamp = (value, fallback = 0) => Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : fallback;
 // brightness, activity, harmonic tension, playing strength, ensemble breadth,
@@ -10,10 +11,25 @@ const clamp = (value, fallback = 0) => Number.isFinite(value) ? Math.max(0, Math
 // artistic controls: a restrained mood can still have deep space and motion.
 // Sadness keeps a broad string section even though its rhythm is restrained.
 const profiles = {
-  happiness: [.91, .74, .14, .78, .90, .68, .60, .78], neutral: [.48, .24, .10, .43, .58, .44, .50, .84],
-  sadness: [.26, .18, .29, .50, .82, .48, .59, .94], surprise: [.91, .88, .48, .90, .90, .89, .91, .85],
-  anger: [.40, .94, .88, .97, .93, .84, .72, .61], fear: [.32, .66, .93, .63, .72, .92, .94, .89],
+  happiness: [.95, .64, .08, .70, .90, .68, .66, .80], neutral: [.48, .24, .10, .43, .58, .44, .50, .84],
+  sadness: [.13, .10, .32, .40, .86, .32, .38, 1], surprise: [.91, .88, .48, .90, .90, .89, .91, .85],
+  anger: [.36, .93, .94, .86, .93, .67, .65, .18], fear: [.42, .48, 1, .42, .48, .95, 1, .95],
   disgust: [.28, .48, .73, .64, .70, .75, .77, .74], contempt: [.42, .34, .58, .55, .63, .59, .69, .81],
+};
+// Independent character weights retain minority emotions in a mixed audience.
+// The other four classes have their own combinations; none is discarded.
+const characters = {
+  happiness: [1, 0, 0, 0], sadness: [0, 1, 0, 0], anger: [0, 0, 1, 0], fear: [0, 0, 0, 1],
+  neutral: [.12, .14, .06, .08], surprise: [.50, 0, .12, .42],
+  disgust: [0, .08, .30, .50], contempt: [.08, .20, .35, .20],
+};
+// strings, brass, synth, bass, melody, percussion: orchestration is deliberately
+// not a single loudness multiplier. Each character has a different foreground.
+const balances = {
+  happiness: [.74, .14, .50, .27, .74, .08], sadness: [.92, .035, .30, .34, .15, .015],
+  anger: [.31, .88, .81, .68, .17, .46], fear: [.18, .04, .62, .09, .80, .065],
+  neutral: [.63, .16, .44, .31, .33, .07], surprise: [.63, .42, .64, .41, .70, .29],
+  disgust: [.38, .32, .68, .48, .37, .13], contempt: [.49, .35, .53, .36, .27, .10],
 };
 function distribution(scores) {
   const values = EMOTIONS.map(key => Number.isFinite(scores?.[key]) ? Math.max(0, scores[key]) : 0);
@@ -28,23 +44,21 @@ export function musicParameters(scores, {idle = false, diversity = 0} = {}) {
   const weights = distribution(scores);
   if (idle || !weights) return {
     brightness: .34, energy: .07, tension: .08, dynamics: .25, orchestration: .36,
-    texture: .18, drift: .30, space: .76,
+    texture: .18, drift: .30, space: .76, joy: 0, sorrow: 0, rage: 0, dread: 0,
     strings: .36, brass: 0, synth: .30, bass: 0, melody: 0, percussion: 0, pad: .36,
     mode: 'suspended', dominant: null, idle: true, diversity: 0,
   };
   const [brightness, energy, tension, dynamics, orchestration, texture, drift, space] = [0, 1, 2, 3, 4, 5, 6, 7].map(index =>
     weights.reduce((total, weight, i) => total + weight * profiles[EMOTIONS[i]][index], 0));
   const diversityValue = clamp(diversity);
-  const strings = clamp(.56 + .28 * orchestration + .12 * (1 - energy));
+  const weighted = table => table[EMOTIONS[0]].map((_, index) =>
+    weights.reduce((sum, weight, i) => sum + weight * table[EMOTIONS[i]][index], 0));
+  const [strings, brass, synth, bass, melody, percussion] = weighted(balances);
+  const character = Object.fromEntries(MUSIC_CHARACTERS.map((key, i) => [key, weighted(characters)[i]]));
   return {
     brightness, energy, tension, dynamics, orchestration,
     texture: clamp(texture + .08 * diversityValue), drift: clamp(drift + .05 * diversityValue), space,
-    strings, pad: strings,
-    brass: clamp((.12 + .63 * dynamics) * (.35 + .65 * energy) * (1 - .25 * tension)),
-    synth: clamp(.33 + .33 * tension + .16 * orchestration),
-    bass: clamp(.30 + .38 * dynamics + .16 * energy),
-    melody: clamp(.16 + .17 * brightness + .10 * (1 - tension) + .06 * diversityValue),
-    percussion: clamp((energy - .15) * (.32 + .15 * dynamics)),
+    ...character, strings, brass, synth, bass, melody, percussion, pad: strings,
     mode: tension > .52 ? 'suspended' : weights[0] >= weights[2] ? 'major' : 'minor',
     dominant: EMOTIONS[weights.indexOf(Math.max(...weights))],
     idle: false, diversity: diversityValue,
@@ -67,7 +81,7 @@ export function sanitizeParameters(parameters = {}) {
   const source = parameters && typeof parameters === 'object' ? parameters : {};
   const fallback = musicParameters(null);
   const result = {
-    ...Object.fromEntries(['brightness', 'energy', 'tension', 'dynamics', 'orchestration', 'texture', 'drift', 'space', 'diversity', ...MUSIC_LAYERS]
+    ...Object.fromEntries(['brightness', 'energy', 'tension', 'dynamics', 'orchestration', 'texture', 'drift', 'space', 'diversity', ...MUSIC_CHARACTERS, ...MUSIC_LAYERS]
       .map(key => [key, clamp(source[key], fallback[key])])),
     idle: Boolean(source.idle),
     mode: ['major', 'minor', 'suspended'].includes(source.mode) ? source.mode : fallback.mode,
@@ -121,9 +135,9 @@ export function planBar(bar, parameters) {
   const accent = .70 + .30 * breath;
   const events = [];
   const note = (layer, beat, midi, seconds, velocity, pan = 0, extra = {}) => {
-    if (p[layer] <= 0) return;
+    if (p[layer] <= 0 || (extra.character && p[extra.character] <= 0)) return;
     events.push({layer, offset: beat * BEAT_SECONDS, midi, duration: seconds,
-      velocity, pan, ...extra});
+      velocity, pan, ...extra, ...(extra.character ? {weight: p[extra.character]} : {})});
   };
   const enters = (period, phase, seed = false) => index % period === phase || (seed && index === 0);
   const strings = [
@@ -151,6 +165,24 @@ export function planBar(bar, parameters) {
   // One held bass pedal, with neither a root progression nor a bar-wise attack.
   if (enters(4, 0)) note('bass', .28 + .17 * grain(index, 31), 38, 11.9,
     (.090 + .063 * p.dynamics) * accent, 0, {kind: 'legato', swell: .45 * breath});
+
+  // A new character can speak in the very next scheduling segment (2.86 s).
+  // These are independent weighted strands, not a dominant-emotion switch.
+  // The envelope's character gain also follows new distributions mid-note.
+  note('strings', .12 + .44 * grain(index, 201), colour([74, 76, 79, 81, 79, 76], index, 9),
+    4.1 + .8 * grain(index, 202), (.093 + .043 * p.dynamics) * accent, -.38 + .7 * grain(index, 203),
+    {kind: 'halo', character: 'joy', instrument: 'violin', swell: .62});
+  note('strings', .15 + .32 * grain(index, 211), colour([57, 53, 50, 50, 53, 50], index, 7),
+    6.4 + 1.4 * grain(index, 212), (.10 + .052 * p.dynamics) * accent, -.24,
+    {kind: 'lament', character: 'sorrow', instrument: 'cello', swell: .82});
+  note('brass', .14 + .64 * grain(index, 221), 50,
+    .95 + 1.15 * grain(index, 222), (.12 + .047 * p.dynamics) * accent, -.22,
+    {kind: 'pressure', character: 'rage', instrument: index % 3 ? 'trombone' : 'horn', swell: .18});
+  note('synth', 1.24 + 1.9 * grain(index, 223), 50, .54 + .91 * grain(index, 224),
+    (.078 + .045 * p.dynamics) * accent, .24, {kind: 'pressure', character: 'rage', swell: .15});
+  note('melody', .17 + .72 * grain(index, 231), colour([81, 86, 83, 81, 86], index, 5),
+    .66 + 1.12 * grain(index, 232), (.085 + .043 * p.dynamics) * accent,
+    -.8 + 1.6 * grain(index, 233), {kind: 'whisper', character: 'dread', swell: .3});
 
   // Brass opens behind the strings in occasional overlapping swells. Horns
   // remain within the sampled range; trombone adds weight without cadences.
@@ -181,10 +213,10 @@ export function planBar(bar, parameters) {
   // pitch field; they never spell out an arpeggio or a sequence of chord roots.
   // Velocity remains small so that the orchestra can carry the large scale.
   if (p.texture > 0) {
-    const fragmentPitches = [62, 69, 74, colour(field.air, index, 31)];
+    const fragmentPitches = [69, 74, 79, colour(field.air, index, 31)];
     const opportunities = 2 + Math.floor(2 * p.texture);
     for (let i = 0; i < opportunities; i++) {
-      if (grain(index, 101 + i * 7) > .55 + .40 * p.texture) continue;
+      if (grain(index, 101 + i * 7) > (.55 + .40 * p.texture) * (1 - .66 * p.sorrow - .42 * p.rage - .40 * p.dread)) continue;
       const pick = Math.floor(grain(index, 102 + i * 7) * fragmentPitches.length);
       note('melody', .08 + 3.80 * grain(index, 103 + i * 7), fragmentPitches[pick],
         .38 + .95 * (1 - .55 * p.energy) * grain(index, 104 + i * 7),
@@ -194,10 +226,10 @@ export function planBar(bar, parameters) {
     }
     // A reverse swell emerges only occasionally, with no synchronised accent
     // from the rest of the orchestra. Its release is handled by the same engine.
-    if (index === 1 || grain(index, 141) < .045 + .10 * p.texture + .04 * p.space) {
-      note('melody', .10 + 3.65 * grain(index, 142), colour(field.upper, index, 19),
+    if (index === 1 || grain(index, 141) < .045 + .10 * p.texture + .04 * p.space + .42 * p.dread) {
+      note('melody', .10 + 3.65 * grain(index, 142), colour(field.air, index, 19),
         3.4 + 3.2 * p.space * grain(index, 143),
-        (.066 + .045 * p.dynamics) * (.65 + .35 * p.texture) * accent,
+        (.066 + .045 * p.dynamics) * (.65 + .35 * p.texture) * accent * (1 + .65 * p.dread),
         -.75 + 1.50 * grain(index, 144),
         {kind: 'reverse', instrument: 'violin', scan: grain(index, 145), swell: .90});
     }

@@ -1,4 +1,4 @@
-import {MUSIC_LAYERS} from './music-math.mjs';
+import {MUSIC_LAYERS} from './music-math.mjs?v=20261027-emotions';
 
 const unit = value => Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
 const bands = [[30, 250], [250, 2000], [2000, 12000]];

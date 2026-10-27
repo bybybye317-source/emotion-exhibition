@@ -1,5 +1,5 @@
-import {MusicMatterVisual} from './music-visual.mjs';
-import {MUSIC_LAYERS} from './music-math.mjs';
+import {MusicMatterVisual} from './music-visual.mjs?v=20261027-emotions';
+import {MUSIC_LAYERS} from './music-math.mjs?v=20261027-emotions';
 
 // The same engine and session used by playback own all visual inputs. No second
 // soundtrack, microphone stream, timer-generated beat, or preview-only signal.

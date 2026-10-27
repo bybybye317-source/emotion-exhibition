@@ -7,7 +7,7 @@ const sound={playing:true,rms:.04,peak:.15,bass:.08,mid:.03,treble:.012,flux:.02
 
 test('the full emotion distribution mixes geometry and pigment continuously',()=>{
  const a=visualProfile({happiness:1}),b=visualProfile({sadness:1}),mix=visualProfile({happiness:3,sadness:1});
- for(const key of ['shape','colorA','colorB'])mix[key].forEach((v,i)=>near(v,a[key][i]*.75+b[key][i]*.25));
+ for(const key of ['shape','form','material','colorA','colorB'])mix[key].forEach((v,i)=>near(v,a[key][i]*.75+b[key][i]*.25));
  assert.notDeepEqual(mix.shape,a.shape);
 });
 test('eight emotions have distinct geometry and palette',()=>{
@@ -16,6 +16,29 @@ test('eight emotions have distinct geometry and palette',()=>{
  assert.equal(new Set(profiles.map(p=>JSON.stringify([p.colorA,p.colorB]))).size,8);
  assert.ok(profiles[0].shape[0]>profiles[2].shape[0]);assert.ok(profiles[2].shape[1]>profiles[0].shape[1]);
  assert.ok(profiles[4].shape[2]>profiles[5].shape[2]);assert.ok(profiles[5].shape[3]>profiles[4].shape[3]);
+});
+test('four principal moods remain distinguishable by silhouette and surface without color',()=>{
+ const [happy,sad,angry,fear]=['happiness','sadness','anger','fear'].map(key=>visualProfile({[key]:1}));
+ const reach=p=>p.form[1]/p.form[0];
+ // These ratios are intentional perceptual separation, not exact preset values.
+ assert.ok(happy.form[0]>fear.form[0]*2,'an opening sheet is over twice the spread of a curled one');
+ assert.ok(reach(sad)>reach(angry)*2.5,'drooping sadness reads vertical against compressed anger');
+ assert.ok(happy.form[3]<fear.form[3]*.7,'happy sheet visibly opens where fear almost coils shut');
+ assert.ok(fear.form[2]-sad.form[2]>.25,'fear has an opposing asymmetric lean');
+ assert.ok(angry.material[0]>happy.material[0]*3,'angry folds have broad dense highlights');
+ assert.ok(fear.material[3]>sad.material[3]*3,'fear retains shifting cold edge light while sadness is subdued');
+ assert.ok(sad.speed<happy.speed/3,'a sad trailing sheet moves substantially more slowly');
+});
+test('all eight mood weights contribute to continuous bounded form and material, including near ties',()=>{
+ const profiles=VISUAL_EMOTIONS.map(key=>visualProfile({[key]:1}));
+ const mix=visualProfile(Object.fromEntries(VISUAL_EMOTIONS.map((key,i)=>[key,i+1]))),sum=36;
+ for(const key of ['form','material'])mix[key].forEach((value,j)=>{
+  near(value,profiles.reduce((total,p,i)=>total+p[key][j]*(i+1)/sum,0));
+  assert.ok(value>=Math.min(...profiles.map(p=>p[key][j]))&&value<=Math.max(...profiles.map(p=>p[key][j])));
+ });
+ const left=visualProfile({happiness:.5001,fear:.4999}),right=visualProfile({happiness:.4999,fear:.5001});
+ assert.notEqual(left.dominant,right.dominant);
+ for(const key of ['shape','form','material'])left[key].forEach((value,j)=>assert.ok(Math.abs(value-right[key][j])<.001,'dominant label cannot switch the form'));
 });
 test('invalid and empty scores fall back to a neutral idle form',()=>{
  for(const scores of [undefined,null,{}, {joy:1},{anger:NaN,sadness:Infinity,fear:-1},{__proto__:{happiness:Infinity}}]){
@@ -48,6 +71,10 @@ test('emotion changes ease without replacing a mixed mood with its dominant labe
  advanceMatterState(state,b,null,1/30);
  assert.ok(state.shape[0]<a.shape[0]&&state.shape[0]>b.shape[0]);
  assert.ok(state.shape[1]>a.shape[1]&&state.shape[1]<b.shape[1]);
+ for(const key of ['form','material'])state[key].forEach((value,i)=>{
+  assert.ok(value>=Math.min(a[key][i],b[key][i])-1e-6&&value<=Math.max(a[key][i],b[key][i])+1e-6);
+  assert.ok(Math.abs(value-a[key][i])<Math.abs(b[key][i]-a[key][i])*.04+1e-6,'all new geometry and surface coordinates ease rather than jump');
+ });
  const phase=state.phase;advanceMatterState(state,b,null,1/30);assert.equal(state.phase,phase);
 });
 test('reduced motion preserves audio correspondence at lower amplitude and speed',()=>{

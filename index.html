@@ -6,11 +6,11 @@
   <meta name="color-scheme" content="light">
   <meta name="description" content="机器如何理解人类的情绪：视觉、听觉与嗅觉模拟，三种感官随群体表情变化。可在浏览器内体验，照片不上传。">
   <title>群体肖像 · 机器如何理解人类的情绪</title>
-  <link rel="stylesheet" href="./static/style.css?v=20261027-matter">
+  <link rel="stylesheet" href="./static/style.css?v=20261027-emotions">
   <script type="importmap">{"imports":{"three":"./static/vendor/three/three.module.js","three/addons/":"./static/vendor/three/addons/"}}</script>
-  <script type="module" src="./static/app.js?v=20261027-matter"></script>
+  <script type="module" src="./static/app.js?v=20261027-emotions"></script>
   <script type="module" src="./static/portrait.js"></script>
-  <script type="module" src="./static/music.js?v=20261027-matter"></script>
+  <script type="module" src="./static/music.js?v=20261027-emotions"></script>
   <script type="module" src="./static/scent.js"></script>
 </head>
 <body>
@@ -57,7 +57,7 @@
             <option value="disgust">厌恶</option>
             <option value="contempt">轻蔑</option>
           </select>
-          <p>每种情绪试听 30–60 秒，感受声音逐渐变形；预览不写入观众记录。</p>
+          <p>每种情绪先试听 10–15 秒，感受音色与形态的变化；预览不写入观众记录。</p>
         </div>
       </details>
     </section>
@@ -65,9 +65,16 @@
     <div id="action-error" class="message error" role="alert" hidden></div>
 
     <section id="music-panel" class="music-panel" role="tabpanel" aria-labelledby="nav-music" hidden>
+      <div class="music-emotion-choices" role="group" aria-label="四种情绪对比，也可回到群体">
+        <button type="button" data-music-emotion="happiness" aria-pressed="false"><strong>快乐</strong><span>明亮 · 舒展</span></button>
+        <button type="button" data-music-emotion="sadness" aria-pressed="false"><strong>悲伤</strong><span>深远 · 下垂</span></button>
+        <button type="button" data-music-emotion="anger" aria-pressed="false"><strong>愤怒</strong><span>厚重 · 挤压</span></button>
+        <button type="button" data-music-emotion="fear" aria-pressed="false"><strong>恐惧</strong><span>稀薄 · 蜷曲</span></button>
+        <button type="button" data-music-emotion="group" aria-pressed="true"><strong>跟随群体</strong><span>融合全部情绪</span></button>
+      </div>
       <div id="music-visual-stage" class="music-visual-stage">
         <canvas id="music-visual-canvas" role="img" aria-label="随真实音乐和群体情绪变化的悬浮薄膜" aria-describedby="music-visual-description"></canvas>
-        <div class="music-visual-heading"><span>MATTER IN SUSPENSION</span><h2>悬浮声场</h2></div>
+        <div class="music-visual-heading"><span>MATTER IN SUSPENSION</span><h2>悬浮声场</h2><p id="music-visual-direction">静候观众</p></div>
         <div id="music-visual-fallback" class="music-visual-fallback" role="status" hidden>当前浏览器无法显示动态画面，音乐仍可正常播放。</div>
         <div class="music-visual-toolbar">
           <div class="music-visual-caption"><p id="music-visual-status" role="status">开启声音，唤醒形变</p><p id="music-visual-description">低频推动体积 · 中频牵动褶皱 · 高频点亮微光</p></div>

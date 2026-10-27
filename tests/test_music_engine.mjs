@@ -5,12 +5,12 @@ import {musicParameters, MUSIC_LAYERS} from '../static/music-math.mjs';
 import {loadOrchestraSamples} from '../static/music-samples.mjs';
 
 class Parameter {
-  constructor(value = 0) { this.value = value; this.changes = 0; }
+  constructor(value = 0) { this.value = value; this.changes = 0; this.timeline = []; }
   cancelAndHoldAtTime() { this.changes++; }
   cancelScheduledValues() { this.changes++; }
-  setValueAtTime(value) { this.value = value; this.changes++; }
-  setTargetAtTime(value) { this.value = value; this.changes++; }
-  linearRampToValueAtTime(value) { this.value = value; this.changes++; }
+  setValueAtTime(value, time) { this.value = value; this.changes++; this.timeline.push({method: 'set', value, time}); }
+  setTargetAtTime(value, time, constant) { this.value = value; this.changes++; this.timeline.push({method: 'target', value, time, constant}); }
+  linearRampToValueAtTime(value, time) { this.value = value; this.changes++; this.timeline.push({method: 'linear', value, time}); }
   exponentialRampToValueAtTime(value) { this.value = value; this.changes++; }
 }
 class Node {
@@ -388,5 +388,64 @@ test('visual analysis taps the actual stereo output and post-gain layers without
     zero(engine.getVisualAnalysis());
     assert.ok(oldMeters.every(node => node.disconnected));
     await engine.dispose(); zero(engine.getVisualAnalysis()); assert.equal(engine.getVisualAnalysis().playing, false);
+  } finally { await engine.dispose(); globalThis.AudioContext = previous; }
+});
+
+
+test('existing voices crossfade character and register before the next bar without restarting their recordings', async () => {
+  const previous = globalThis.AudioContext; globalThis.AudioContext = FakeContext;
+  const engine = new EmotionMusicEngine();
+  const joy = musicParameters({happiness: 1}), sorrow = musicParameters({sadness: 1});
+  try {
+    engine.setTarget(joy); await engine.start(); engine._graph.stopVoices(0);
+    const graph = engine._graph;
+    graph.note({layer: 'strings', kind: 'halo', character: 'joy', instrument: 'violin', midi: 79, duration: 8, velocity: .12}, 1, joy);
+    graph.note({layer: 'strings', kind: 'legato', instrument: 'cello', midi: 50, duration: 11, velocity: .12}, 1, joy);
+    const [halo, cello] = [...graph.voices];
+    assert.equal(halo.presence.gain.value, 1); assert.ok(cello.presence.gain.value < .2);
+    const source = halo.sources[0], start = source.started, stop = source.stopped, nodeCount = engine._context.nodes.length;
+    engine._context.currentTime = 2; engine.setTarget(sorrow);
+    assert.equal(engine._context.nodes.length, nodeCount, 'a transition must not rebuild or allocate voices');
+    assert.equal(halo.sources[0], source); assert.equal(source.started, start); assert.equal(source.stopped, stop);
+    assert.equal(halo.presence.gain.value, 0); assert.ok(cello.presence.gain.value > 1);
+    for (const voice of [halo, cello]) {
+      const change = voice.presence.gain.timeline.at(-1);
+      assert.equal(change.method, 'target'); assert.equal(change.time, 2);
+      assert.ok(change.constant >= .5 && change.constant <= 1.1, 'transition must be smooth but audible in 2–4 seconds');
+    }
+    engine.setTarget(musicParameters({happiness: .01, sadness: .99}));
+    assert.ok(Math.abs(halo.presence.gain.value - .01) < 1e-10, 'minority character must remain audible at its continuous weight');
+    const count = changes(engine._context);
+    engine.setTarget({...engine.getStatus().parameters});
+    assert.equal(changes(engine._context), count);
+    await engine.pause(); assert.equal(graph.voices.size, 0);
+  } finally { await engine.dispose(); globalThis.AudioContext = previous; }
+});
+
+test('short pressure, slow lament and high beating whisper use distinct real envelopes with bounded oscillators', async () => {
+  const previous = globalThis.AudioContext; globalThis.AudioContext = FakeContext;
+  const engine = new EmotionMusicEngine();
+  try {
+    await engine.start(); engine._graph.stopVoices(0);
+    const anger = musicParameters({anger: 1}), sad = musicParameters({sadness: 1}), fear = musicParameters({fear: 1});
+    const cases = [
+      [{layer: 'brass', kind: 'pressure', character: 'rage', instrument: 'trombone', midi: 50, duration: 1.5, velocity: .12}, anger],
+      [{layer: 'strings', kind: 'lament', character: 'sorrow', instrument: 'cello', midi: 53, duration: 7, velocity: .12}, sad],
+      [{layer: 'melody', kind: 'whisper', character: 'dread', midi: 86, duration: 1.3, velocity: .12}, fear],
+    ];
+    for (const [event, parameters] of cases) assert.equal(engine._graph.note(event, 10, parameters), true);
+    const [pressure, lament, whisper] = [...engine._graph.voices];
+    assert.equal(pressure.sampled, true); assert.equal(lament.sampled, true);
+    assert.equal(pressure.sources.length, 1); assert.equal(lament.sources.length, 1);
+    const attack = voice => voice.parts[0].gain.timeline.find(e => e.method === 'linear').time - 10;
+    assert.ok(attack(pressure) < .1); assert.ok(attack(lament) >= 1.4);
+    assert.equal(whisper.sampled, false); assert.equal(whisper.sources.length, 2);
+    assert.ok(whisper.sources.every(source => source.type === 'sine'));
+    const frequencies = whisper.sources.map(source => source.frequency.timeline.find(e => e.method === 'set').value);
+    assert.ok(frequencies[0] > 1000 && frequencies[0] < 1300);
+    assert.ok(Math.abs(frequencies[0] - frequencies[1]) > 1 && Math.abs(frequencies[0] - frequencies[1]) < 4);
+    assert.equal(engine._graph.note(cases[0][0], 11, fear), false, 'stale rage event must not return after a new target');
+    for (const voice of [pressure, lament, whisper]) for (const source of voice.sources) source.onended();
+    assert.equal(engine._graph.voices.size, 0);
   } finally { await engine.dispose(); globalThis.AudioContext = previous; }
 });

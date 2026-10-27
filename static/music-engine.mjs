@@ -1,6 +1,6 @@
-import {MUSIC_BPM, BAR_SECONDS, MUSIC_LAYERS, musicParameters, sanitizeParameters, planBar, midiFrequency} from './music-math.mjs';
+import {MUSIC_BPM, BAR_SECONDS, MUSIC_LAYERS, musicParameters, sanitizeParameters, planBar, midiFrequency} from './music-math.mjs?v=20261027-emotions';
 import {loadOrchestraSamples, selectOrchestraSample} from './music-samples.mjs';
-import {createMusicAnalysis, createVisualFrame, clearVisualFrame} from './music-analysis.mjs';
+import {createMusicAnalysis, createVisualFrame, clearVisualFrame} from './music-analysis.mjs?v=20261027-emotions';
 
 const MAX_VOICES = 64;
 const LOOKAHEAD = .16;
@@ -70,7 +70,25 @@ const layerSettings = {
   melody: {highpass: 150, cutoff: 2300, range: 6200, send: .48, vibrato: 5.5, rate: .117},
   percussion: {highpass: 32, cutoff: 3900, range: 4700, send: .24, vibrato: 0, rate: 1},
 };
-const cutoffFor = (layer, p) => layerSettings[layer].cutoff + layerSettings[layer].range * (.72 * p.brightness + .28 * p.dynamics);
+const cutoffFor = (layer, p) => Math.min(9200,
+  (layerSettings[layer].cutoff + layerSettings[layer].range * (.72 * p.brightness + .28 * p.dynamics)) *
+  (layer === 'strings' ? 1 - .46 * (p.sorrow || 0) : layer === 'brass' ? 1 - .25 * (p.rage || 0) : 1));
+const sendFor = (layer, p) => layerSettings[layer].send * (.22 + 1.10 * p.space + .28 * (p.sorrow || 0));
+const echoFor = (layer, p) => ({strings: .055, brass: .025, synth: .25, bass: 0, melody: .49, percussion: .08})[layer] * (.18 + .82 * p.space);
+const motionFor = p => .002 + .005 * p.drift + .012 * (p.dread || 0);
+function presenceFor(event, p) {
+  if (event.character) return limit(p[event.character]);
+  if (p.idle) return 1;
+  // Old sustained voices change foreground while new gestures enter. In
+  // particular the cello bed no longer masks fear's gaps or joy's high halo.
+  if (event.layer === 'strings') return event.instrument === 'cello'
+    ? .44 + .72 * (p.sorrow || 0) - .29 * (p.joy || 0) - .30 * (p.dread || 0)
+    : .69 + .36 * (p.joy || 0) - .53 * (p.sorrow || 0) - .45 * (p.dread || 0);
+  if (event.layer === 'synth' && event.kind === 'legato')
+    return .74 - .49 * (p.dread || 0) - .32 * (p.rage || 0) - .24 * (p.sorrow || 0);
+  if (event.layer === 'brass') return 1 - .72 * (p.rage || 0);
+  return 1;
+}
 
 function makeGraph(context, parameters, volume, offline = false, samples = null) {
   const nodes = [], voices = new Set(), continuousSources = [];
@@ -107,7 +125,7 @@ function makeGraph(context, parameters, volume, offline = false, samples = null)
   const reverb = own(context.createConvolver()); reverb.buffer = hallImpulse(context);
   const wetHighpass = own(context.createBiquadFilter()); wetHighpass.type = 'highpass'; wetHighpass.frequency.value = 180;
   const wetLowpass = own(context.createBiquadFilter()); wetLowpass.type = 'lowpass'; wetLowpass.frequency.value = 5700; wetLowpass.Q.value = .5;
-  const wet = own(context.createGain()); wet.gain.value = .72 + .30 * parameters.space;
+  const wet = own(context.createGain()); wet.gain.value = .28 + .94 * parameters.space;
   reverb.connect(wetHighpass); wetHighpass.connect(wetLowpass); wetLowpass.connect(wet); wet.connect(compressor);
   // A pair of unsynchronised, gently moving echoes. Cross-feedback is always
   // below .43 per pass, and each pass removes sub-bass and high-frequency energy.
@@ -115,11 +133,11 @@ function makeGraph(context, parameters, volume, offline = false, samples = null)
     const delay = own(context.createDelay(1.5)); delay.delayTime.value = index ? .677 : .431;
     const highpass = own(context.createBiquadFilter()); highpass.type = 'highpass'; highpass.frequency.value = 280;
     const lowpass = own(context.createBiquadFilter()); lowpass.type = 'lowpass'; lowpass.frequency.value = index ? 2900 : 3600;
-    const feedback = own(context.createGain()); feedback.gain.value = .25 + .17 * parameters.space;
-    const level = own(context.createGain()); level.gain.value = .29 + .21 * parameters.space;
+    const feedback = own(context.createGain()); feedback.gain.value = .12 + .30 * parameters.space;
+    const level = own(context.createGain()); level.gain.value = .08 + .42 * parameters.space;
     const pan = own(context.createStereoPanner()); pan.pan.value = index ? .78 : -.78;
     const motion = own(context.createOscillator()); motion.frequency.value = index ? .023 : .037;
-    const depth = own(context.createGain()); depth.gain.value = .003 + .009 * parameters.drift;
+    const depth = own(context.createGain()); depth.gain.value = motionFor(parameters);
     motion.connect(depth); depth.connect(delay.delayTime); motion.start(); continuousSources.push(motion);
     delay.connect(highpass); highpass.connect(lowpass); lowpass.connect(feedback);
     lowpass.connect(level); level.connect(pan); pan.connect(compressor); pan.connect(reverb);
@@ -133,10 +151,10 @@ function makeGraph(context, parameters, volume, offline = false, samples = null)
     const highpass = own(context.createBiquadFilter()); highpass.type = 'highpass'; highpass.frequency.value = settings.highpass; highpass.Q.value = .55;
     const filter = own(context.createBiquadFilter()); filter.type = 'lowpass'; filter.Q.value = .5; filter.frequency.value = cutoffFor(layer, parameters);
     const gain = own(context.createGain()); gain.gain.value = parameters[layer];
-    const send = own(context.createGain()); send.gain.value = settings.send;
+    const send = own(context.createGain()); send.gain.value = sendFor(layer, parameters);
     input.connect(highpass); highpass.connect(filter); filter.connect(gain); gain.connect(compressor); gain.connect(send); send.connect(reverb);
     const echoSend = own(context.createGain());
-    echoSend.gain.value = ({strings: .055, brass: .025, synth: .25, bass: 0, melody: .49, percussion: .08})[layer];
+    echoSend.gain.value = echoFor(layer, parameters);
     gain.connect(echoSend); echoSend.connect(echoes[layer === 'melody' ? 1 : 0].delay);
     let vibrato = null;
     if (settings.vibrato) {
@@ -144,7 +162,7 @@ function makeGraph(context, parameters, volume, offline = false, samples = null)
       vibrato = own(context.createGain()); vibrato.gain.value = settings.vibrato;
       lfo.connect(vibrato); lfo.start(); continuousSources.push(lfo);
     }
-    layers[layer] = {input, filter, gain, vibrato};
+    layers[layer] = {input, filter, gain, vibrato, send, echoSend};
   }
   const waves = makeWaves(context), noise = makeNoise(context, 3.6);
   const analysis = offline ? null : createMusicAnalysis(context, safety,
@@ -155,22 +173,32 @@ function makeGraph(context, parameters, volume, offline = false, samples = null)
     setSamples(bank) { samples = bank; },
     update(next, now, immediate = false) {
       if (Math.abs(next.space - previous.space) > .0005) {
-        smooth(wet.gain, .72 + .30 * next.space, now, immediate ? .015 : 2.8);
+        smooth(wet.gain, .28 + .94 * next.space, now, immediate ? .015 : 1.1);
         for (const echo of echoes) {
-          smooth(echo.feedback.gain, .25 + .17 * next.space, now, immediate ? .015 : 2.8);
-          smooth(echo.level.gain, .29 + .21 * next.space, now, immediate ? .015 : 2.8);
+          smooth(echo.feedback.gain, .12 + .30 * next.space, now, immediate ? .015 : 1.1);
+          smooth(echo.level.gain, .08 + .42 * next.space, now, immediate ? .015 : 1.1);
         }
       }
-      if (Math.abs(next.drift - previous.drift) > .0005)
-        for (const echo of echoes) smooth(echo.depth.gain, .003 + .009 * next.drift, now, immediate ? .015 : 3.2);
+      if (Math.abs(motionFor(next) - motionFor(previous)) > .000005)
+        for (const echo of echoes) smooth(echo.depth.gain, motionFor(next), now, immediate ? .015 : 1.1);
       for (const layer of MUSIC_LAYERS) {
-        if (Math.abs(next[layer] - previous[layer]) > .0005) smooth(layers[layer].gain.gain, next[layer], now, immediate ? .015 : 1.4);
-        if (Math.abs(next.brightness - previous.brightness) > .0005 || Math.abs(next.dynamics - previous.dynamics) > .0005)
-          smooth(layers[layer].filter.frequency, cutoffFor(layer, next), now, immediate ? .015 : 1.7);
+        if (Math.abs(next[layer] - previous[layer]) > .0005) smooth(layers[layer].gain.gain, next[layer], now, immediate ? .015 : .85);
+        if (Math.abs(cutoffFor(layer, next) - cutoffFor(layer, previous)) > .05)
+          smooth(layers[layer].filter.frequency, cutoffFor(layer, next), now, immediate ? .015 : 1.0);
+        if (Math.abs(sendFor(layer, next) - sendFor(layer, previous)) > .00005)
+          smooth(layers[layer].send.gain, sendFor(layer, next), now, immediate ? .015 : 1.1);
+        if (Math.abs(echoFor(layer, next) - echoFor(layer, previous)) > .00005)
+          smooth(layers[layer].echoSend.gain, echoFor(layer, next), now, immediate ? .015 : 1.1);
+      }
+      for (const voice of voices) {
+        const amount = presenceFor(voice.event, next);
+        if (Math.abs(amount - presenceFor(voice.event, previous)) > .00005)
+          smooth(voice.presence.gain, amount, now, immediate ? .015 : .8);
       }
       previous = next;
     },
     note(event, when, p) {
+      if (event.character && !limit(p[event.character])) return false;
       if (!layers[event.layer] || !Number.isFinite(when) || !Number.isFinite(event.duration) || event.duration <= .025) return false;
       if ([...voices].filter(voice => voice.end > when).length >= MAX_VOICES) return false;
       const texture = event.layer === 'melody' && ['grain', 'reverse'].includes(event.kind);
@@ -181,7 +209,8 @@ function makeGraph(context, parameters, volume, offline = false, samples = null)
       const add = node => { parts.push(node); return node; };
       const env = add(context.createGain()); env.gain.value = 0;
       const pan = add(context.createStereoPanner()); pan.pan.value = event.layer === 'bass' ? 0 : Math.max(-.85, Math.min(.85, event.pan || 0));
-      env.connect(pan); pan.connect(layers[event.layer].input);
+      const presence = add(context.createGain()); presence.gain.value = presenceFor(event, p);
+      env.connect(presence); presence.connect(pan); pan.connect(layers[event.layer].input);
       const duration = event.duration, end = when + duration;
       const peak = Math.max(0, Math.min(.5, event.velocity || 0));
       const swell = limit(event.swell ?? .4), dynamics = p.dynamics;
@@ -231,11 +260,14 @@ function makeGraph(context, parameters, volume, offline = false, samples = null)
           source.connect(balance); balance.connect(env); sources.push(source);
           // Preserve the recorded bow/breath attack. The prepared crossfaded
           // sustain loop then supports long, independently overlapping swells.
-          envelope(event.layer === 'strings' ? .32 + .32 * (1 - dynamics) : .22 + .30 * (1 - dynamics), .72, Math.min(1.8, duration * .25), true);
+          if (event.kind === 'pressure') envelope(.045 + .075 * (1 - dynamics), .38, duration * .34);
+          else if (event.kind === 'lament') envelope(1.5, .68, 2.5, true);
+          else if (event.kind === 'halo') envelope(.32, .60, 1.7, true);
+          else envelope(event.layer === 'strings' ? .32 + .32 * (1 - dynamics) : .22 + .30 * (1 - dynamics), .72, Math.min(1.8, duration * .25), true);
           break;
         }
         case 'synth': {
-          const color = add(context.createBiquadFilter()); color.type = 'lowpass'; color.Q.value = 1.1 + 1.7 * richness;
+          const color = add(context.createBiquadFilter()); color.type = 'lowpass'; color.Q.value = .8 + 1.2 * richness;
           color.frequency.setValueAtTime(frequency * (2.1 + 1.5 * p.brightness), when);
           color.frequency.exponentialRampToValueAtTime(frequency * (5.5 + 4 * richness), when + duration * .57);
           color.frequency.exponentialRampToValueAtTime(frequency * (2.8 + p.brightness), end);
@@ -245,12 +277,13 @@ function makeGraph(context, parameters, volume, offline = false, samples = null)
           oscillator('sine', frequency, .25, 0);
           const index = add(context.createGain()); index.gain.value = 0; index.connect(left.frequency);
           index.gain.setValueAtTime(frequency * .012, when);
-          index.gain.linearRampToValueAtTime(frequency * (.06 + .15 * richness), when + duration * .55);
+          index.gain.linearRampToValueAtTime(frequency * (.035 + .10 * richness + .32 * (p.rage || 0)), when + duration * .55);
           index.gain.linearRampToValueAtTime(frequency * .015, end);
-          oscillator('sine', frequency * 1.41421356, 1, 0, index);
+          oscillator('sine', frequency * (1.41421356 + .31 * (p.rage || 0)), 1, 0, index);
           right.detune.setValueAtTime(7 + 5 * drift, when);
           right.detune.linearRampToValueAtTime(-3 - 9 * drift, end);
-          envelope(.8 + .5 * (1 - p.energy), .72, 1.45, true);
+          if (event.kind === 'pressure' || event.kind === 'pulse') envelope(.035, .28, duration * .40);
+          else envelope(.8 + .5 * (1 - p.energy), .72, 1.45, true);
           break;
         }
         case 'bass': {
@@ -290,6 +323,17 @@ function makeGraph(context, parameters, volume, offline = false, samples = null)
               env.gain.linearRampToValueAtTime(peak * .5, when + duration * .73);
             }
             env.gain.linearRampToValueAtTime(0, end);
+            break;
+          }
+          if (event.kind === 'whisper') {
+            // A narrow pair separated by a few hertz gives fragile beating,
+            // with no loud noise burst or piercing high-frequency harmonics.
+            oscillator('sine', frequency, .54, -2.8);
+            const twin = oscillator('sine', frequency + 3.1, .46, 2.8);
+            twin.frequency.linearRampToValueAtTime(frequency + 1.3, end);
+            pan.pan.linearRampToValueAtTime(-pan.pan.value * .92, when + duration * .34);
+            pan.pan.linearRampToValueAtTime(pan.pan.value * .4, end);
+            envelope(.19, .19, duration * .43, true);
             break;
           }
           if (event.kind === 'spark') {
@@ -337,7 +381,7 @@ function makeGraph(context, parameters, volume, offline = false, samples = null)
           break;
         }
       }
-      const voice = {sources, parts, end, modulation, layer: event.layer, sampled, texture, kind: event.kind, instrument: sample?.instrument}; voices.add(voice);
+      const voice = {sources, parts, end, modulation, presence, event, layer: event.layer, sampled, texture, kind: event.kind, instrument: sample?.instrument}; voices.add(voice);
       let ended = 0, cleaned = false;
       const cleanup = () => {
         if (cleaned) return; cleaned = true;
@@ -509,7 +553,7 @@ export class EmotionMusicEngine {
         const event = this._plan[this._cursor], when = start + event.offset;
         if (when > now + LOOKAHEAD) break;
         this._cursor++;
-        if (when >= now + .005) this._graph.note(event, when, this._active);
+        if (when >= now + .005) this._graph.note(event, when, this._target);
       }
       if (this._cursor === this._plan.length && start + BAR_SECONDS <= now + LOOKAHEAD) this._planBar(this._plannedBar + 1);
       else break;

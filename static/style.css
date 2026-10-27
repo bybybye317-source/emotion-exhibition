@@ -67,3 +67,18 @@ select{font:inherit;color:inherit}select:focus-visible,.view-tab:focus-visible{o
 .music-visual-stage{width:100%;min-width:0}
 @media(max-width:650px){.music-visual-stage{aspect-ratio:.9;min-height:400px}.music-visual-stage canvas{height:calc(100% - 96px)}.music-visual-stage:fullscreen canvas{height:100%}}
 @media(pointer:coarse){.music-visual-actions .button{min-height:44px}}
+
+.music-emotion-choices{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:0 0 14px}
+.music-emotion-choices button{--emotion-ink:#4e6466;--emotion-surface:#e5eeee;display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-height:58px;min-width:0;padding:11px 14px;border:1px solid #d4dfdf;border-radius:7px;background:#fff;color:#53666c;text-align:left;transition:background .2s,border-color .2s}
+.music-emotion-choices button strong{font-size:13px;font-weight:600;line-height:1.4}
+.music-emotion-choices button span{font-size:11px;line-height:1.4;color:#6e8085}
+.music-emotion-choices button:hover{background:#f1f5f6;border-color:#a6bbbc}
+.music-emotion-choices button[aria-pressed=true]{background:var(--emotion-surface);border-color:var(--emotion-ink);color:var(--emotion-ink)}
+.music-emotion-choices button[aria-pressed=true] span{color:inherit}
+.music-emotion-choices [data-music-emotion=happiness]{--emotion-ink:#795f23;--emotion-surface:#f8f0d7}
+.music-emotion-choices [data-music-emotion=sadness]{--emotion-ink:#355e85;--emotion-surface:#e5edf8}
+.music-emotion-choices [data-music-emotion=anger]{--emotion-ink:#92483b;--emotion-surface:#f7e8e3}
+.music-emotion-choices [data-music-emotion=fear]{--emotion-ink:#625086;--emotion-surface:#ece7f6}
+.music-visual-heading p{margin:10px 0 0;font-size:11px;letter-spacing:.06em;line-height:1.6;color:#aab4c6}
+@media(max-width:650px){.music-emotion-choices{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.music-emotion-choices button{padding:10px 7px;min-height:56px;gap:4px;align-items:center;text-align:center}.music-emotion-choices button strong{font-size:12px}.music-emotion-choices button span{font-size:10px}.music-emotion-choices [data-music-emotion=group]{grid-column:1/-1;min-height:38px;flex-direction:row;justify-content:center;gap:12px;padding:7px 12px}.music-visual-heading p{font-size:10px;margin-top:7px}}
+@media(prefers-reduced-motion:reduce){.music-emotion-choices button{transition:none}}

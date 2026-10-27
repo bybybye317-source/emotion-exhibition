@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {MUSIC_BPM, MUSIC_LAYERS, EMOTIONS, BAR_SECONDS, musicParameters, sanitizeParameters, groupDiversity, planBar, eventsInWindow} from '../static/music-math.mjs';
+import {MUSIC_BPM, MUSIC_LAYERS, MUSIC_CHARACTERS, EMOTIONS, BAR_SECONDS, musicParameters, sanitizeParameters, groupDiversity, planBar, eventsInWindow} from '../static/music-math.mjs';
 import {selectOrchestraSample, validateSampleManifest, MAX_SAMPLE_TRANSPOSE} from '../static/music-samples.mjs';
 const close = (a, b) => assert.ok(Math.abs(a - b) < 1e-10, `${a} != ${b}`);
-const numericKeys = ['brightness', 'energy', 'tension', 'dynamics', 'orchestration', 'texture', 'drift', 'space', 'diversity', ...MUSIC_LAYERS];
+const numericKeys = ['brightness', 'energy', 'tension', 'dynamics', 'orchestration', 'texture', 'drift', 'space', 'diversity', ...MUSIC_CHARACTERS, ...MUSIC_LAYERS];
 const score = (p, bars = 64) => Array.from({length: bars}, (_, bar) => planBar(bar, p));
 const layer = (bars, name) => bars.flat().filter(e => e.layer === name);
 
@@ -19,8 +19,8 @@ for (const emotion of EMOTIONS) test(`${emotion}: six bounded layers and long pl
     assert.ok(events.every(e => e.velocity > 0 && e.velocity < .25 && Math.abs(e.pan) <= 1));
     assert.ok(events.filter(e => Number.isFinite(e.midi)).every(e => Number.isInteger(e.midi) && e.midi >= 38 && e.midi <= 86));
     assert.ok(events.filter(e => e.swell !== undefined).every(e => e.swell >= 0 && e.swell <= 1));
-    assert.ok(events.filter(e => e.layer === 'strings').every(e => e.duration >= 10 && e.kind === 'legato'));
-    assert.ok(events.filter(e => e.layer === 'brass').every(e => e.duration >= 7 && e.kind === 'legato'));
+    assert.ok(events.filter(e => e.layer === 'strings' && !e.character).every(e => e.duration >= 10 && e.kind === 'legato'));
+    assert.ok(events.filter(e => e.layer === 'brass' && !e.character).every(e => e.duration >= 7 && e.kind === 'legato'));
   }
 });
 
@@ -54,7 +54,7 @@ test('every mood holds the same D bass pedal instead of cycling chord roots', ()
     assert.deepEqual(new Set(layer(bars, 'bass').map(e => e.midi)), new Set([38]));
     assert.ok(bars.filter(events => events.some(e => e.layer === 'bass')).length <= 24);
     assert.ok(layer(bars, 'bass').every(e => e.duration > 4 * BAR_SECONDS));
-    assert.deepEqual(new Set(layer(bars, 'strings').filter(e => e.instrument === 'cello').map(e => e.midi)), new Set([50, 57]));
+    assert.deepEqual(new Set(layer(bars, 'strings').filter(e => e.instrument === 'cello' && !e.character).map(e => e.midi)), new Set([50, 57]));
   }
 });
 
@@ -66,11 +66,11 @@ test('upper colour moves independently rather than repeating four or eight bar c
   assert.notDeepEqual(signature(bars[8]), signature(bars[16]));
   assert.notDeepEqual(planBar(0, p), planBar(8, p));
   // These are long asynchronous entrances, not six chord tones retriggered every bar.
-  assert.ok(bars.slice(1).filter(events => events.filter(e => e.layer === 'strings').length <= 2).length > 50);
-  assert.ok(layer(bars, 'strings').every(e => e.offset > 0 && e.duration > 3 * BAR_SECONDS));
+  assert.ok(bars.slice(1).filter(events => events.filter(e => e.layer === 'strings' && !e.character).length <= 2).length > 50);
+  assert.ok(layer(bars, 'strings').filter(e => !e.character).every(e => e.offset > 0 && e.duration > 3 * BAR_SECONDS));
   const violinVoices = new Map();
   for (let bar = 0; bar < bars.length; bar++) {
-    for (const event of bars[bar].filter(e => e.layer === 'strings' && e.instrument === 'violin')) {
+    for (const event of bars[bar].filter(e => e.layer === 'strings' && e.instrument === 'violin' && !e.character)) {
       if (!violinVoices.has(event.pan)) violinVoices.set(event.pan, []);
       violinVoices.get(event.pan).push({bar, midi: event.midi});
     }
@@ -247,4 +247,78 @@ test('external controls sanitize non-finite and out-of-range input', () => {
   assert.doesNotThrow(() => planBar(-Infinity, null));
   assert.deepEqual(planBar(-3, p), planBar(0, p));
   assert.ok(planBar(Number.MAX_VALUE, p).every(e => Number.isFinite(e.offset) && Number.isFinite(e.velocity)));
+});
+
+
+test('four characters have separate foregrounds, registers and articulations within the next short segment', () => {
+  const expected = {
+    happiness: {character: 'joy', kind: 'halo', layer: 'strings', min: 74, max: 81, duration: [4, 5]},
+    sadness: {character: 'sorrow', kind: 'lament', layer: 'strings', min: 50, max: 57, duration: [6, 8]},
+    anger: {character: 'rage', kind: 'pressure', layer: 'brass', min: 50, max: 50, duration: [.9, 2.2]},
+    fear: {character: 'dread', kind: 'whisper', layer: 'melody', min: 81, max: 86, duration: [.6, 1.8]},
+  };
+  for (const [emotion, spec] of Object.entries(expected)) {
+    const p = musicParameters({[emotion]: 1});
+    for (const events of score(p, 128)) {
+      const identity = events.filter(e => e.character === spec.character && e.layer === spec.layer);
+      assert.equal(identity.length, 1);
+      const e = identity[0];
+      assert.equal(e.kind, spec.kind); assert.equal(e.weight, 1);
+      assert.ok(e.midi >= spec.min && e.midi <= spec.max);
+      assert.ok(e.duration >= spec.duration[0] && e.duration <= spec.duration[1]);
+      assert.ok(e.offset + BAR_SECONDS < 3.6, `${emotion} needs too long to enter`);
+      assert.ok(events.filter(e => e.character).every(e => e.character === spec.character));
+    }
+  }
+  const happy = musicParameters({happiness: 1}), sad = musicParameters({sadness: 1});
+  const anger = musicParameters({anger: 1}), fear = musicParameters({fear: 1});
+  assert.ok(sad.strings > sad.synth * 2 && sad.strings > sad.brass * 10);
+  assert.ok(anger.brass > happy.brass * 4 && anger.synth > anger.strings * 2);
+  assert.ok(fear.melody > fear.strings * 4 && fear.bass < happy.bass * .4);
+  assert.ok(happy.melody > sad.melody * 4 && happy.brightness > sad.brightness * 5);
+  assert.ok(anger.space < fear.space * .25 && anger.space < sad.space * .25);
+  const reverses = p => score(p, 128).flat().filter(e => e.kind === 'reverse').length;
+  assert.ok(reverses(fear) > reverses(happy) * 2);
+});
+
+test('all numeric musical controls and minority gestures blend continuously across the complete distribution', () => {
+  const emotions = ['happiness', 'sadness', 'anger', 'fear'];
+  const weights = [.42, .31, .26, .01];
+  const p = musicParameters(Object.fromEntries(emotions.map((key, i) => [key, weights[i]])));
+  for (const key of numericKeys.filter(key => key !== 'diversity')) {
+    close(p[key], emotions.reduce((sum, emotion, i) => sum + musicParameters({[emotion]: 1})[key] * weights[i], 0));
+  }
+  const events = planBar(12, p);
+  for (const [i, character] of MUSIC_CHARACTERS.entries()) {
+    const voices = events.filter(e => e.character === character);
+    assert.ok(voices.length, `minority ${character} disappeared`);
+    assert.ok(voices.every(e => Math.abs(e.weight - weights[i]) < 1e-10));
+  }
+  for (const emotion of EMOTIONS) {
+    const single = musicParameters({[emotion]: 1});
+    assert.ok(MUSIC_CHARACTERS.some(key => single[key] > 0));
+  }
+  const before = musicParameters({happiness: .50001, sadness: .49999});
+  const after = musicParameters({happiness: .49999, sadness: .50001});
+  for (const key of numericKeys) assert.ok(Math.abs(before[key] - after[key]) < .0001);
+  const oldPreset = sanitizeParameters({energy: .5, strings: .7, mode: 'major'});
+  assert.ok(MUSIC_CHARACTERS.every(key => oldPreset[key] === 0));
+  const invalid = sanitizeParameters({joy: Infinity, sorrow: -1, rage: 4, dread: NaN});
+  assert.deepEqual(MUSIC_CHARACTERS.map(key => invalid[key]), [0, 0, 1, 0]);
+});
+
+test('all mixed character voices retain headroom inside the existing runtime budget', () => {
+  const boundaries = [];
+  for (let bar = 0; bar < 256; bar++) {
+    const p = musicParameters(Object.fromEntries(EMOTIONS.map((emotion, i) => [emotion, 1 + ((bar + i * 7) % 11)])), {diversity: 1});
+    for (const e of planBar(bar, p)) {
+      const start = bar * BAR_SECONDS + e.offset;
+      boundaries.push([start, 1], [start + e.duration, -1]);
+    }
+  }
+  boundaries.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  let active = 0, peak = 0;
+  for (const [, change] of boundaries) { active += change; peak = Math.max(peak, active); }
+  assert.ok(peak <= 40, `mixed score peak ${peak} leaves insufficient margin below 64`);
+  assert.equal(active, 0);
 });

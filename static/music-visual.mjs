@@ -1,39 +1,46 @@
-import {VISUAL_EMOTIONS, visualProfile, createMatterState, advanceMatterState} from './music-visual-math.mjs';
+import {VISUAL_EMOTIONS, visualProfile, createMatterState, advanceMatterState} from './music-visual-math.mjs?v=20261027-emotions';
 
 const vertex = `
 precision highp float;
 attribute vec2 aUv;
-uniform float uTime;uniform float uAspect;uniform vec4 uMood;
+uniform float uTime;uniform float uAspect;uniform vec4 uMood;uniform vec4 uForm;
 uniform vec4 uAudio;uniform vec4 uLayers;uniform float uDrive;
 varying vec3 vNormal;varying vec3 vPosition;varying vec2 vUv;varying float vCrease;
 mat2 rot(float a){return mat2(cos(a),-sin(a),sin(a),cos(a));}
 vec3 surface(vec2 uv){
- float a=-.65+uv.x*5.48;
+ float a=-.65+uv.x*uForm.w;
  float v=(uv.y-.5)*2.;
  float t=uTime*.22;
- float wave=sin(a*3.+v*2.4-t)*(.13+uAudio.y*.048+uLayers.x*.035);
- wave+=sin(a*7.1-v*4.3+t*.61)*(.055+uAudio.y*.026);
+ float wave=sin(a*(3.-uMood.x*.65)+v*2.4-t)*(.13+uAudio.y*.048+uLayers.x*.035);
+ wave+=sin(a*7.1-v*4.3+t*.61)*(.055+uAudio.y*.026)*(1.-uMood.x*.42);
  wave+=sin(a*13.4+v*7.-t*.32)*(.021+uAudio.z*.014);
- wave+=uMood.z*.06*sin(a*11.+v*5.-t*3.5);
- wave+=uMood.w*.016*sin(v*25.+a*9.-t*5.);
+ float crease=sin(a*8.4+v*5.2-t*1.6);
+ wave+=uMood.z*.12*crease/(.38+abs(crease));
+ // Fear is a local tremor in a folded edge, never a global camera shake.
+ wave+=uMood.w*.026*uDrive*sin(v*29.+a*17.-t*9.)*exp(-pow(v-.28,2.)*10.);
  // A spectral onset travels through a localized crease, rather than shaking the camera.
  wave+=uAudio.w*.072*sin(a*9.-v*6.-t*4.)*exp(-pow(v-.25*sin(a*2.),2.)*5.);
  float radius=.76+wave+.05*sin(v*4.-t);
- radius*=1.+uAudio.x*.14+uLayers.y*.045;
- radius*=1.+uMood.x*.11*sin(a*.5)+uMood.z*.04*sin(t*4.-a*2.);
+ radius*=1.+uAudio.x*(.10+uMood.z*.12)+uLayers.y*.055;
+ radius*=1.+uMood.x*.14*sin(a*.5)+uMood.z*.055*uDrive*sin(t*3.-a*2.);
  float h=.63+.17*sin(a*1.4)+.10*sin(a*2.9);
  float y=v*h;
- float curl=pow(abs(v),3.)*(.17+.12*sin(a*2.)+uAudio.z*.04);
+ float curl=pow(abs(v),3.)*(.17+.12*sin(a*2.)+uAudio.z*.04+uMood.w*.16-uMood.x*.07);
  radius+=curl;
  y+=.10*sin(a*3.5+v*3.+t*.6);
- y-=uMood.y*(.14+.25*pow(abs(v),2.));
- radius*=1.-uMood.w*.14*(.5+.5*sin(a*2.-t*1.4));
- y+=uMood.x*.10*sin(a*1.8);
+ y-=uMood.y*(.10+.30*pow(abs(v),2.)+.10*sin(a*1.2));
+ radius*=1.-uMood.w*.24*(.5+.5*sin(a*1.5-t*.65));
+ y+=uMood.x*(.12+.20*(1.-v*v)*sin(a*.8));
  vec3 p=vec3(cos(a)*radius,y,sin(a)*radius);
- p.xz=rot(y*(.58+uLayers.w*.12)+.17*sin(y*2.-t*.3))*p.xz;
+ p.z+=uMood.z*.16*(1.-v*v);
+ p.xz=rot(y*(.58+uLayers.w*.12+uMood.w*.52)+.17*sin(y*2.-t*.3))*p.xz;
  p.yz=rot(.24)*p.yz;
  p.xz=rot(-.52+.065*sin(t*.37))*p.xz;
- p.xy=rot(-.52)*p.xy;
+ p.x*=uForm.x;
+ p.y*=uForm.y;
+ p.x+=uMood.w*.16*v*v;
+ p.xy=rot(uForm.z)*p.xy;
+ p.y+=uMood.x*.02+uMood.y*.22;
  p.x+=.07;
  return p;
 }
@@ -44,14 +51,16 @@ void main(){
  vNormal=normalize(cross(du,dv));vPosition=p;vUv=aUv;
  vCrease=.5+.5*sin(aUv.x*31.+aUv.y*13.-uTime*.22);
  float z=3.5-p.z;
- // Leave space for expansion even at the loudest peaks and on narrow screens.
- gl_Position=vec4(p.x*1.88/uAspect,p.y*1.88,1.01*z-.2,z);
+ // Fit the broadest folded sheet in portrait as well as landscape; keep the
+ // heading and transport clear even when real audio expands the membrane.
+ float fit=min(1.,uAspect/1.15);
+ gl_Position=vec4(p.x*1.46*fit/uAspect,p.y*1.46*fit+.025*z,1.01*z-.2,z);
 }`;
 
 const fragment = `
 precision highp float;
 varying vec3 vNormal;varying vec3 vPosition;varying vec2 vUv;varying float vCrease;
-uniform vec3 uColorA;uniform vec3 uColorB;uniform float uTime;
+uniform vec3 uColorA;uniform vec3 uColorB;uniform float uTime;uniform vec4 uMood;uniform vec4 uMaterial;
 uniform vec4 uAudio;uniform vec4 uLayers;uniform float uDrive;
 void main(){
  vec3 N=normalize(vNormal);if(!gl_FrontFacing)N=-N;
@@ -62,8 +71,8 @@ void main(){
  float fresnel=pow(1.-facing,2.6);
  float front=max(0.,dot(N,L));
  float back=max(0.,dot(-N,L));
- float key=pow(max(0.,dot(R,normalize(vec3(-.4,.85,1.0)))),18.);
- float strip=pow(max(0.,1.-abs(dot(R,normalize(vec3(.42,.9,-.1))))),65.);
+ float key=pow(max(0.,dot(R,normalize(vec3(-.4,.85,1.0)))),mix(28.,8.,uMaterial.x));
+ float strip=pow(max(0.,1.-abs(dot(R,normalize(vec3(.42,.9,-.1))))),mix(80.,28.,uMaterial.x));
  strip*=smoothstep(-.4,.8,R.z);
  float blue=pow(max(0.,dot(R,normalize(vec3(.7,-.35,1.)))),10.);
  float micro=sin(vUv.x*1800.+sin(vUv.y*45.)*2.4)*.5+.5;
@@ -75,10 +84,13 @@ void main(){
  float thickness=.28+.72*(1.-edge);
  vec3 pigment=mix(uColorA*.055,uColorB*.11,front*.4+wrinkle*.25);
  vec3 color=pigment*(.18+front*.4)*ao;
+ color+=uColorA*uMaterial.z*(.12+front*.35)*ao;
  color+=uColorB*(key*.85+strip*(.70+uAudio.z*.34+uLayers.z*.30))*(.66+fiber*.25+crossFiber*.09)*ao;
- color+=uColorA*(blue*.72+fresnel*(.26+uAudio.z*.26))*(.6+.4*wrinkle);
- color+=mix(uColorA,uColorB,edge*.8)*(edge*(.24+uLayers.z*.28)+back*.04)*(1.-thickness*.4);
+ color+=uColorA*(blue*(.43+uMaterial.w*.45)+fresnel*(.16+uMaterial.y*.18+uAudio.z*.26))*(.6+.4*wrinkle);
+ color+=mix(uColorA,uColorB,edge*.8)*(edge*(uMaterial.y*.40+uLayers.z*.28)+back*.04)*(1.-thickness*.4);
  color+=uColorA*.14*pow(1.-thickness,2.)*(.5+.5*sin(vUv.x*14.));
+ // Pressure glows inside the compressed creases, not across the whole screen.
+ color+=uColorB*uMood.z*pow(1.-smoothstep(.15,.8,vCrease),3.)*(.07+uAudio.x*.13);
  color*=.88+uDrive*.25;
  gl_FragColor=vec4(color,1.);
 }`;
@@ -165,7 +177,7 @@ export class MusicMatterVisual {
       this.indices=this._own('Buffer', gl.createBuffer());gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,this.indices);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,indices,gl.STATIC_DRAW);
       this.quad=this._own('Buffer', gl.createBuffer());gl.bindBuffer(gl.ARRAY_BUFFER,this.quad);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
       this.meshAttr=gl.getAttribLocation(this.mesh,'aUv');this.postAttr=gl.getAttribLocation(this.post,'aPosition');
-      this.uniforms={};for(const name of ['uTime','uAspect','uMood','uColorA','uColorB','uAudio','uLayers','uDrive'])this.uniforms[name]=gl.getUniformLocation(this.mesh,name);
+      this.uniforms={};for(const name of ['uTime','uAspect','uMood','uForm','uMaterial','uColorA','uColorB','uAudio','uLayers','uDrive'])this.uniforms[name]=gl.getUniformLocation(this.mesh,name);
       this.imageLocation=gl.getUniformLocation(this.post,'uImage');this.sizeLocation=gl.getUniformLocation(this.post,'uSize');
       this.target=this._own('Framebuffer',gl.createFramebuffer());this.texture=this._own('Texture',gl.createTexture());this.depth=this._own('Renderbuffer',gl.createRenderbuffer());
       gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
@@ -208,7 +220,7 @@ export class MusicMatterVisual {
     this._audioUniform.set([s.bass,s.mid,s.treble,s.flux]);this._layerUniform.set([s.strings,s.brass,s.melody,s.synth]);
     gl.viewport(0,0,this.canvas.width,this.canvas.height);gl.bindFramebuffer(gl.FRAMEBUFFER,this.target);gl.enable(gl.DEPTH_TEST);gl.clearColor(0,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.mesh);
     gl.bindBuffer(gl.ARRAY_BUFFER,this.vertices);gl.enableVertexAttribArray(this.meshAttr);gl.vertexAttribPointer(this.meshAttr,2,gl.FLOAT,false,0,0);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,this.indices);
-    gl.uniform1f(u.uTime,s.phase);gl.uniform1f(u.uAspect,this.canvas.width/this.canvas.height);gl.uniform4fv(u.uMood,s.shape);gl.uniform3fv(u.uColorA,s.colorA);gl.uniform3fv(u.uColorB,s.colorB);gl.uniform4fv(u.uAudio,this._audioUniform);gl.uniform4fv(u.uLayers,this._layerUniform);gl.uniform1f(u.uDrive,s.drive);
+    gl.uniform1f(u.uTime,s.phase);gl.uniform1f(u.uAspect,this.canvas.width/this.canvas.height);gl.uniform4fv(u.uMood,s.shape);gl.uniform4fv(u.uForm,s.form);gl.uniform4fv(u.uMaterial,s.material);gl.uniform3fv(u.uColorA,s.colorA);gl.uniform3fv(u.uColorB,s.colorB);gl.uniform4fv(u.uAudio,this._audioUniform);gl.uniform4fv(u.uLayers,this._layerUniform);gl.uniform1f(u.uDrive,s.drive);
     gl.drawElements(gl.TRIANGLES,this._count,gl.UNSIGNED_SHORT,0);
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.disable(gl.DEPTH_TEST);gl.useProgram(this.post);gl.bindBuffer(gl.ARRAY_BUFFER,this.quad);gl.enableVertexAttribArray(this.postAttr);gl.vertexAttribPointer(this.postAttr,2,gl.FLOAT,false,0,0);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.uniform1i(this.imageLocation,0);gl.uniform2f(this.sizeLocation,this.canvas.width,this.canvas.height);gl.drawArrays(gl.TRIANGLES,0,6);
     this.canvas.dataset.emotion=this._profile.dominant;this.canvas.dataset.drive=s.drive.toFixed(4);this.canvas.dataset.phase=s.phase.toFixed(4);this.canvas.dataset.frame=String(++this._frames);

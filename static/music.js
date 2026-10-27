@@ -1,9 +1,19 @@
-import { EmotionMusicEngine } from './music-engine.mjs?v=20261027-matter';
-import { musicParameters, groupDiversity } from './music-math.mjs';
-import { connectMusicVisual } from './music-visual-controller.mjs';
+import { EmotionMusicEngine } from './music-engine.mjs?v=20261027-emotions';
+import { musicParameters, groupDiversity } from './music-math.mjs?v=20261027-emotions';
+import { connectMusicVisual } from './music-visual-controller.mjs?v=20261027-emotions';
 
 const $ = id => document.getElementById(id);
 const labels = { happiness: '快乐', neutral: '中性', sadness: '悲伤', surprise: '惊讶', anger: '愤怒', fear: '恐惧', disgust: '厌恶', contempt: '轻蔑' };
+const directions = {
+  happiness: {sound: '高弦与泛音向上展开，微光穿过通透的合成器音场。', motion: '舒展 · 上托'},
+  sadness: {sound: '低弦缓慢下沉，柔暗的合成器与长尾在远处消散。', motion: '垂落 · 拖曳'},
+  anger: {sound: '铜管、粗粝合成器与低频压力靠近，短促冲击穿过暗处。', motion: '紧褶 · 挤压'},
+  fear: {sound: '稀薄高音、细微拍频与反向涌流，在不规则的留白中浮现。', motion: '蜷曲 · 回缩'},
+  neutral: {sound: '弦乐与合成器平缓悬浮，细微色彩从中流过。', motion: '悬浮 · 平衡'},
+  surprise: {sound: '明亮的弦乐、碎片与合成器涌流交错浮现。', motion: '张开 · 悬停'},
+  disgust: {sound: '偏暗的粗粝音色与不稳定纹理缓慢交织。', motion: '偏转 · 收拢'},
+  contempt: {sound: '克制的弦乐和疏离的微光，留出不确定的空间。', motion: '倾斜 · 收束'},
+};
 const idleAfter = 120_000;
 let session = null;
 let connected = false;
@@ -41,8 +51,11 @@ function render() {
   $('music-error').hidden = !errorMessage;
   text('music-error', errorMessage);
   const playingParameters = playing ? audio.parameters || target : target;
-  const description = playingParameters.idle ? '弦乐与合成器在远处轻声悬浮，等待下一位观众。' : `${playingParameters.mode === 'major' ? '通透开阔' : playingParameters.mode === 'minor' ? '幽深绵长' : '悬浮不定'}的音场 · ${playingParameters.texture > .75 ? '碎片与微光交错浮现' : '稀疏碎片缓慢漂浮'} · ${playingParameters.drift > .75 ? '音色游移，回声向远处散开' : '倒放涌流，色彩缓慢变形'}`;
+  const character = directions[playingParameters.dominant] || directions.neutral;
+  const description = playingParameters.idle ? '弦乐与合成器在远处轻声悬浮，等待下一位观众。' : `${preview === 'group' ? '群体混合声景 · ' : ''}${character.sound}`;
   text('music-description', description);
+  text('music-visual-direction', preview !== 'group' ? `${labels[preview]} · ${directions[preview].motion}` : visualScores ? '群体情绪 · 混合形态' : '静候观众');
+  document.querySelectorAll('[data-music-emotion]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.musicEmotion === preview)));
   text('music-dynamics-value', `${Math.round((playingParameters.dynamics ?? 0) * 100)}%`);
   text('music-orchestration-value', `${Math.round((playingParameters.orchestration ?? 0) * 100)}%`);
   for (const name of ['texture', 'drift', 'space']) {
@@ -106,6 +119,7 @@ function selectPreview(value, origin) {
 
 $('artwork-preview').addEventListener('change', event => selectPreview(event.target.value, 'artwork'));
 $('portrait-preview').addEventListener('change', event => selectPreview(event.target.value, 'portrait'));
+document.querySelectorAll('[data-music-emotion]').forEach(button => button.addEventListener('click', () => selectPreview(button.dataset.musicEmotion, 'music')));
 $('music-volume').addEventListener('input', event => {
   const percent = Math.max(0, Math.min(100, Number(event.target.value) || 0));
   engine.setVolume(percent / 100);

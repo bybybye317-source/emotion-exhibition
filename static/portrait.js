@@ -58,7 +58,8 @@ class GroupPortrait {
     this.texture=new THREE.CanvasTexture(this.atlas);this.texture.colorSpace=THREE.SRGBColorSpace;
     this.texture.anisotropy=4;this.texture.flipY=true;
     this.photoUniform={value:0};
-    this.scene=new THREE.Scene();this.scene.background=new THREE.Color('#d9dfe3');
+    this.scene=new THREE.Scene();
+    this.scene.background=new THREE.Color(getComputedStyle(stage).getPropertyValue('--portrait-stage-bg').trim() || '#080a0d');
     this.camera=new THREE.PerspectiveCamera(35,1,.05,60);
     this.renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.7));

@@ -1,0 +1,245 @@
+/* Black gallery: shared chrome for the three artworks and participation flow. */
+:root {
+  color-scheme: dark;
+  --background: #090a0c;
+  --surface: #191c22;
+  --panel: #111317;
+  --ink: #e8e5df;
+  --muted: #9b9da4;
+  --border: #2b2d33;
+  --accent: #c8b693;
+  --accent-dark: #dfcdab;
+  --radius: 6px;
+  --portrait-stage-bg: #080a0d;
+}
+html { background: var(--background); scrollbar-color: #46484e var(--background); }
+body { background: var(--background); color: var(--ink); -webkit-font-smoothing: antialiased; }
+::selection { background: #665840; color: #fff7e9; }
+.app-shell { max-width: 1440px; padding: 28px 40px 36px; }
+.page-header { gap: 28px; padding-bottom: 24px; margin-bottom: 0; border-bottom: 1px solid var(--border); }
+.page-header h1 { font-family: "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", SimSun, serif; font-size: 32px; font-weight: 500; letter-spacing: .055em; line-height: 1.35; }
+.identity { gap: 24px; }
+.identity .project-title { font-size: 12px; font-weight: 400; color: var(--muted); letter-spacing: .07em; }
+.view-tabs { gap: 28px; }
+.view-tab { color: var(--muted); font-weight: 400; font-size: 14px; padding: 12px 2px; border-bottom-width: 1px; letter-spacing: .06em; }
+.view-tab[aria-selected=true], .view-tab:hover { color: var(--accent); }
+.connection { color: var(--muted); font-size: 11px; padding-left: 24px; }
+.status-dot { width: 6px; height: 6px; background: #8c919a; }
+.connection.connected .status-dot { background: var(--accent); }
+.connection.problem .status-dot { background: #d59a74; }
+.web-intro { display: grid; grid-template-columns: minmax(0,1fr) 330px; gap: 8px 40px; align-items: start; margin: 0 0 24px; padding: 24px 0; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; }
+.web-intro>p { grid-column: 1; margin: 0; max-width: 760px; color: #b3b4b8; font-size: 13px; line-height: 1.85; }
+.web-intro>p strong { display: block; margin-bottom: 5px; color: var(--ink); font-size: 18px; font-weight: 500; letter-spacing: .055em; }
+.web-intro .web-privacy { color: var(--muted); font-size: 11px; line-height: 1.8; }
+.web-intro .artwork-preview-details { grid-column: 2; grid-row: 1 / span 2; border: 0; margin: 0; }
+.artwork-preview-details summary { color: #c1beb7; font-size: 12px; padding: 0 0 10px; }
+.artwork-preview-details summary .icon { color: var(--muted); }
+.web-intro .artwork-preview-body { padding: 0; gap: 8px 12px; }
+.web-intro .artwork-preview-body label { font-size: 11px; color: var(--muted); font-weight: 400; }
+.web-intro .artwork-preview-body p { color: var(--muted); font-size: 10px; line-height: 1.7; }
+.artwork-preview-body select, .portrait-preview-body select { background: var(--panel); border-color: #46484e; color: var(--ink); border-radius: 5px; min-height: 38px; }
+select option { background: #111317; color: var(--ink); }
+button:focus-visible, summary:focus-visible, input:focus-visible, select:focus-visible, .view-tab:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.button { border-color: #45474e; background: #15171c; color: var(--ink); border-radius: 5px; font-weight: 500; }
+.button:hover:not(:disabled) { background: #22252b; border-color: #8b8272; }
+.button.primary, .music-toggle[aria-pressed=true] { background: var(--accent); color: #15130f; border-color: var(--accent); }
+.button.primary:hover:not(:disabled) { background: var(--accent-dark); border-color: var(--accent-dark); color: #15130f; }
+.button.subtle { background: #15171c; color: #b4b5ba; border-color: var(--border); }
+.button:disabled { opacity: .42; }
+.panel { background: var(--panel); border-color: var(--border); box-shadow: none; }
+.panel h2, .portrait-status, .portrait-distribution h3 { font-weight: 500; }
+.score-row { border-color: #24262c; }
+.score-number { color: #b6b6bd; }
+.score-fill { background: #807867; }
+.score-row.highest .score-fill { background: var(--accent); }
+.performance, .empty-icon { color: #9699a3; }
+.count { color: #c4c2bd; background: #202229; border-radius: 4px; }
+.error { color: #ebae9b; background: #261b1a; border-color: #68423c; }
+.camera-feedback p.rejected { color: #e6a58b; }
+.camera-feedback p.completed { color: var(--accent); }
+.preview { background: #101216; border: 1px solid var(--border); }
+.camera-placeholder, .camera-placeholder h2 { color: #b8bac0; }
+.camera-placeholder h2 { font-weight: 500; }
+.camera-icon { color: #8e929c; }
+.preview-badge { background: rgba(12,14,18,.88); color: #ddd9cf; border: 1px solid #41434a; }
+.image-test { border-color: var(--border); }
+.image-test summary { color: #c1bdb4; }
+input::file-selector-button { color: var(--ink); background: #1a1c22; border-color: #45474e; border-radius: 5px; }
+input::file-selector-button:hover { background: #282b32; }
+.page-footer { margin-top: 30px; padding-top: 18px; border-color: var(--border); color: var(--muted); gap: 14px 24px; flex-wrap: wrap; }
+.page-footer p { font-size: 11px; }
+.page-footer a { color: #bfb49e; text-underline-offset: 4px; }
+.page-footer .model-status { font-size: 10px; }
+
+/* Portrait: a lit sculpture in the same dark gallery, with original photo color. */
+.portrait-heading { font-size: 23px; font-weight: 400; letter-spacing: .025em; margin-bottom: 22px; }
+.portrait-workspace { background: var(--portrait-stage-bg); border: 1px solid #22252c; border-radius: 6px; }
+.portrait-rail { padding-top: 16px; }
+.portrait-count { font-size: 32px; font-weight: 400; letter-spacing: -.03em; }
+.portrait-controls-hint { color: #aeb2bc; text-shadow: 0 1px 5px #000; }
+.portrait-control.button { border-color: #4b4e57; background: rgba(20,22,28,.85); color: #dddfe5; }
+.portrait-control.button:hover { background: #2a2d35; color: var(--ink); border-color: #958b79; }
+.portrait-control[aria-pressed=true], .portrait-control[aria-pressed=true]:hover { background: var(--accent); color: #15130f; border-color: var(--accent); }
+.portrait-no-data, .portrait-stage-error { color: var(--muted); }
+.portrait-preview-details summary { font-weight: 500; }
+
+/* Sound: one uninterrupted stage, with a quiet instrument strip beneath. */
+.music-panel { padding: 0; background: transparent; border: 0; border-radius: 0; }
+.music-emotion-choices { gap: 0; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; margin-bottom: 18px; }
+.music-emotion-choices button { --emotion-ink: #d9c7a5; --emotion-surface: #201e19; align-items: center; text-align: center; min-height: 62px; padding: 12px; border: 0; border-right: 1px solid var(--border); border-radius: 0; background: #0e1013; color: #d3d0ca; font-weight: 400; }
+.music-emotion-choices button:last-child { border-right: 0; }
+.music-emotion-choices button strong { font-size: 14px; font-weight: 500; letter-spacing: .09em; }
+.music-emotion-choices button span { color: #a0a0a8; font-size: 11px; }
+.music-emotion-choices button:hover { background: #181b20; }
+.music-emotion-choices button[aria-pressed=true] { background: var(--emotion-surface); color: var(--emotion-ink); box-shadow: inset 0 0 0 1px var(--emotion-ink); }
+.music-emotion-choices [data-music-emotion=happiness] { --emotion-ink: #ddc68d; --emotion-surface: #211e16; }
+.music-emotion-choices [data-music-emotion=sadness] { --emotion-ink: #a9c0df; --emotion-surface: #171e28; }
+.music-emotion-choices [data-music-emotion=anger] { --emotion-ink: #e3a397; --emotion-surface: #281b1a; }
+.music-emotion-choices [data-music-emotion=fear] { --emotion-ink: #c8b3e5; --emotion-surface: #201b2a; }
+.music-visual-stage { border: 1px solid #262a32; border-radius: 6px; margin-bottom: 18px; aspect-ratio: 2.35; min-height: 400px; }
+.music-visual-heading h2 { font-family: "Songti SC", "Noto Serif CJK SC", SimSun, serif; font-size: 23px; letter-spacing: .15em; font-weight: 400; }
+.music-visual-heading>span { color: #a5a7ae; letter-spacing: .23em; font-size: 9px; }
+.music-visual-heading p { color: #b4b5be; }
+.music-visual-actions .button { background: rgba(19,22,28,.88); color: #dddfe5; border-color: #4b4f59; }
+.music-visual-actions .button:hover:not(:disabled) { background: #292d36; border-color: #8f887a; }
+.music-visual-actions .button[aria-pressed=true] { background: var(--accent); color: #15130f; border-color: var(--accent); }
+.music-main { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 22px 24px; gap: 24px; }
+.music-heading h2 { font-size: 18px; font-weight: 400; letter-spacing: .04em; }
+.music-status { background: #242119; color: #d4c19f; font-size: 10px; border-radius: 3px; }
+.music-source { color: #b1b2b9; font-size: 11px; }
+.music-character { color: var(--muted); font-size: 10px; }
+.music-character output, .music-texture output { color: #d0c8b9; }
+.music-layer { color: #aaadb6; }
+.music-layer-track { height: 3px; background: #2c2f37; }
+.music-layer-fill { background: #c8b693; }
+.music-layer:nth-child(2) .music-layer-fill { background: #b5a47f; }
+.music-layer:nth-child(3) .music-layer-fill { background: #9caec4; }
+.music-layer:nth-child(4) .music-layer-fill { background: #a1a6b7; }
+.music-layer:nth-child(5) .music-layer-fill { background: #b8a6c8; }
+.music-layer:nth-child(6) .music-layer-fill { background: #baa383; }
+.music-volume-control { color: #b4b3b6; }
+.music-volume-control input { accent-color: var(--accent); }
+.music-texture { margin-top: 18px; padding: 14px 0 0; border-color: var(--border); color: var(--muted); }
+.music-texture-title { color: #d0c6b4; font-weight: 400; }
+.music-notes { margin-top: 10px; }
+.music-notes p, .music-notes p:first-child { color: var(--muted); }
+.scent-panel-link { color: #c8b693; border-color: #645b49; }
+.scent-panel-link:hover { color: #e7d8bc; }
+
+/* Scent: open rails and a fine timeline, including every running state. */
+.scent-panel { --scent-accent: #c8b693; --scent-accent-light: #25221c; padding: 10px 0 0; background: transparent; border: 0; border-radius: 0; }
+.scent-header { margin-bottom: 38px; }
+.scent-heading h2 { font-size: 25px; font-weight: 400; letter-spacing: .04em; }
+.scent-simulation-badge { background: transparent; border-color: #41434a; color: #b5b5bd; border-radius: 4px; }
+.scent-source { color: var(--muted); margin-top: 10px; }
+.scent-controls .button { min-height: 44px; padding: 11px 18px; }
+.scent-toggle.button.primary, .scent-toggle.button.primary:hover:not(:disabled), .scent-toggle[aria-pressed=true] { background: var(--accent)!important; border-color: var(--accent)!important; color: #17140e; }
+.scent-toggle.button.primary:hover:not(:disabled) { background: var(--accent-dark)!important; border-color: var(--accent-dark)!important; }
+.scent-stop.button.subtle { background: transparent; color: #c8bfae; border-color: #625a4b; }
+.scent-stop.button.subtle:hover:not(:disabled) { background: #24211c; border-color: var(--accent); }
+.scent-layout { gap: 48px; }
+.scent-process { border-color: var(--border); padding-left: 48px; }
+.scent-section-heading { border-bottom: 1px solid var(--border); padding-bottom: 14px; }
+.scent-section-heading h3 { color: #dcd8d0; font-size: 17px; font-weight: 400; letter-spacing: .04em; }
+.scent-recipe-code { color: var(--muted); }
+.scent-recipe-name { color: var(--ink); font-size: 28px; font-weight: 400; letter-spacing: .02em; margin: 24px 0; }
+.scent-channels { gap: 22px; }
+.scent-channel { --channel: #d1ae70; grid-template-columns: 60px minmax(0,1fr) 42px 90px; }
+.scent-channel[data-scent-channel=floral] { --channel: #bb94a6; }
+.scent-channel[data-scent-channel=wood] { --channel: #a99a88; }
+.scent-channel[data-scent-channel=herbal] { --channel: #9eb79a; }
+.scent-channel-label { color: #d2d0cc; }
+.scent-channel-track { height: 5px; background: #282b31; }
+.scent-channel-ratio { color: #c4c4ca; }
+.scent-channel-output { background: #15171c; border-color: #363940; color: #a7a9b2; }
+.scent-channel-output.is-on, .scent-channel-output[data-active=true] { background: #25281f; border-color: #647452; color: #d0dfb8; }
+.scent-recipe-note { color: var(--muted); margin-top: 24px; }
+.scent-pending { color: #ddcd9f; background: #252218; border-left-color: #a39160; }
+.scent-status { color: #d7c9ae; background: #242119; border-radius: 3px; }
+.scent-phase-track { margin: 30px 0; }
+.scent-phase-track li { color: #a6a8b1; }
+.scent-phase-track li:not(:last-child)::after { background: #41434b; }
+.scent-phase-number { color: #bfc0c7; background: #111317; border-color: #676a74; }
+.scent-phase-track li.is-active, .scent-phase-track li[aria-current=step] { color: var(--scent-accent); font-weight: 500; }
+.scent-phase-track li.is-active .scent-phase-number, .scent-phase-track li[aria-current=step] .scent-phase-number { color: #12140f; background: var(--scent-accent); border-color: var(--scent-accent); box-shadow: 0 0 0 4px var(--scent-accent-light); }
+.scent-phase-track li.is-complete .scent-phase-number { color: #c4c4ba; border-color: #686c61; background: #1c211b; }
+.scent-panel[data-phase=releasing] { --scent-accent: #b7c594; --scent-accent-light: #22271c; }
+.scent-panel[data-phase=purging] { --scent-accent: #a6c3c3; --scent-accent-light: #1c2729; }
+.scent-panel[data-phase=waiting] { --scent-accent: #c1b5a2; --scent-accent-light: #27231e; }
+.scent-progress-heading { color: #afb0b8; }
+.scent-countdown { color: #d5c7ab; font-weight: 400; }
+.scent-progress { height: 4px; background: #2c2e35; }
+.scent-detail { color: #b4b6bd; }
+.scent-cycle-note, .scent-cycle-note span { color: var(--muted); }
+.scent-history { border-color: var(--border); margin-top: 34px; }
+.scent-history summary { padding: 18px 0; color: #c2beb4; }
+.scent-log li, .scent-log time { color: #a5aaa7; }
+
+@media(max-width:1200px) {
+  .app-shell { padding: 26px 28px 30px; }
+  .identity .project-title { margin-top: 5px; }
+  .music-main { padding: 20px; }
+  .scent-layout { gap: 30px; }
+  .scent-process { padding-left: 30px; }
+}
+@media(max-width:900px) {
+  .page-header { gap: 20px; padding-bottom: 20px; }
+  .identity .project-title { margin-top: 0; }
+  .web-intro { grid-template-columns: minmax(0,1fr); gap: 12px; padding: 20px 0; }
+  .web-intro .artwork-preview-details { grid-column: 1; grid-row: auto; margin-top: 4px; }
+  .web-intro .artwork-preview-body { gap: 10px 14px; }
+  .web-intro .artwork-preview-body p { width: auto; }
+  .artwork-preview-details summary { padding-bottom: 10px; }
+  .music-main { gap: 20px; }
+  .music-visual-stage { aspect-ratio: 1.85; }
+}
+@media(max-width:650px) {
+  .app-shell { padding: 22px 18px 28px; }
+  .page-header { gap: 18px 10px; padding-bottom: 16px; }
+  .page-header h1 { font-size: 29px; }
+  .identity .project-title { margin-top: 7px; font-size: 11px; }
+  .view-tabs { gap: 20px; }
+  .view-tab { font-size: 12px; padding: 9px 0; }
+  .connection { padding-left: 10px; font-size: 9px; gap: 6px; }
+  .web-intro { padding: 18px 0; margin-bottom: 20px; gap: 8px; }
+  .web-intro>p { font-size: 12px; }
+  .web-intro>p strong { font-size: 16px; margin-bottom: 5px; }
+  .web-intro .web-privacy { font-size: 10px; line-height: 1.8; }
+  .web-intro .artwork-preview-body p { width: 100%; }
+  .music-emotion-choices { gap: 0; margin-bottom: 14px; }
+  .music-emotion-choices button { min-height: 59px; padding: 10px 5px; }
+  .music-emotion-choices button strong { font-size: 12px; }
+  .music-emotion-choices button span { font-size: 9px; }
+  .music-emotion-choices [data-music-emotion=fear] { border-right: 0; }
+  .music-emotion-choices [data-music-emotion=group] { border-top: 1px solid var(--border); min-height: 40px; }
+  .music-visual-stage { aspect-ratio: .9; min-height: 400px; }
+  .music-visual-heading h2 { font-size: 21px; }
+  .music-main { padding: 18px 16px; }
+  .music-heading h2 { font-size: 17px; }
+  .music-volume-control { font-size: 10px; }
+  .music-texture { gap: 5px 14px; font-size: 10px; padding-top: 13px; }
+  .portrait-heading { font-size: 19px; line-height: 1.65; }
+  .portrait-count { font-size: 27px; }
+  .scent-panel { padding: 4px 0 0; }
+  .scent-header { gap: 20px; margin-bottom: 30px; }
+  .scent-heading h2 { font-size: 23px; }
+  .scent-simulation-badge { font-size: 9px; }
+  .scent-layout { gap: 28px; }
+  .scent-process { padding: 26px 0 0; }
+  .scent-section-heading { padding-bottom: 12px; }
+  .scent-section-heading h3 { font-size: 16px; }
+  .scent-recipe-name { font-size: 26px; margin: 21px 0; }
+  .scent-channel { grid-template-columns: 50px minmax(0,1fr) 32px 82px; gap: 8px; }
+  .scent-channels { gap: 19px; }
+  .page-footer { margin-top: 26px; gap: 10px; }
+  .page-footer p { font-size: 10px; line-height: 1.8; }
+}
+@media(max-width:370px) {
+  .app-shell { padding-left: 13px; padding-right: 13px; }
+  .view-tabs { gap: 14px; }
+  .connection { padding-left: 7px; font-size: 8px; }
+  .scent-heading { gap: 9px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .music-emotion-choices button, .button { transition: none; }
+}

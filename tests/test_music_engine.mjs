@@ -6,7 +6,7 @@ import {loadOrchestraSamples} from '../static/music-samples.mjs';
 
 class Parameter {
   constructor(value = 0) { this.value = value; this.changes = 0; this.timeline = []; }
-  cancelAndHoldAtTime() { this.changes++; }
+  cancelAndHoldAtTime(time) { this.changes++; this.timeline.push({method: 'hold', time}); }
   cancelScheduledValues() { this.changes++; }
   setValueAtTime(value, time) { this.value = value; this.changes++; this.timeline.push({method: 'set', value, time}); }
   setTargetAtTime(value, time, constant) { this.value = value; this.changes++; this.timeline.push({method: 'target', value, time, constant}); }
@@ -411,7 +411,7 @@ test('existing voices crossfade character and register before the next bar witho
     for (const voice of [halo, cello]) {
       const change = voice.presence.gain.timeline.at(-1);
       assert.equal(change.method, 'target'); assert.equal(change.time, 2);
-      assert.ok(change.constant >= .5 && change.constant <= 1.1, 'transition must be smooth but audible in 2–4 seconds');
+      assert.ok(change.constant >= .25 && change.constant <= .4, 'existing voices must reach over 90% of their new weight within one second');
     }
     engine.setTarget(musicParameters({happiness: .01, sadness: .99}));
     assert.ok(Math.abs(halo.presence.gain.value - .01) < 1e-10, 'minority character must remain audible at its continuous weight');
@@ -419,6 +419,45 @@ test('existing voices crossfade character and register before the next bar witho
     engine.setTarget({...engine.getStatus().parameters});
     assert.equal(changes(engine._context), count);
     await engine.pause(); assert.equal(graph.voices.size, 0);
+  } finally { await engine.dispose(); globalThis.AudioContext = previous; }
+});
+
+test('rapid emotion changes hold current automation and respond without restarting notes or their envelopes', async () => {
+  const previous = globalThis.AudioContext; globalThis.AudioContext = FakeContext;
+  const engine = new EmotionMusicEngine();
+  try {
+    await engine.start(); engine._graph.stopVoices(0);
+    engine._graph.note({layer: 'strings', kind: 'legato', instrument: 'cello', midi: 50, duration: 11, velocity: .12}, 1, engine._target);
+    const voice = [...engine._graph.voices][0];
+    const envelope = structuredClone(voice.parts[0].gain.timeline);
+    const sources = voice.sources.map(source => ({source, start: source.started, stop: source.stopped}));
+    const nodes = engine._context.nodes.length, master = engine._graph.master.gain.changes;
+    for (const [index, emotion] of ['happiness', 'sadness', 'anger', 'fear', 'happiness'].entries()) {
+      const now = 2 + index * .2;
+      engine._context.currentTime = now;
+      const parameters = engine._context.nodes.flatMap(node => Object.values(node).filter(value => value instanceof Parameter));
+      const before = parameters.map(parameter => parameter.timeline.length);
+      engine.setTarget(musicParameters({[emotion]: 1}));
+      let updated = 0;
+      parameters.forEach((parameter, index) => {
+        const events = parameter.timeline.slice(before[index]);
+        if (!events.length) return;
+        updated++;
+        assert.equal(events.length, 2, 'only a hold and a new smooth target are scheduled');
+        assert.deepEqual(events[0], {method: 'hold', time: now});
+        assert.equal(events[1].method, 'target'); assert.equal(events[1].time, now);
+        assert.ok(Number.isFinite(events[1].value));
+        assert.ok(events[1].constant >= .25 && events[1].constant <= .5, 'all control changes must start now and approach their target within a second');
+      });
+      assert.ok(updated >= MUSIC_LAYERS.length, 'the live mix and timbre must update before the next scheduled note');
+    }
+    assert.equal(engine._context.nodes.length, nodes);
+    assert.deepEqual(voice.parts[0].gain.timeline, envelope, 'long note attack and release envelopes are preserved');
+    assert.equal(engine._graph.master.gain.changes, master, 'emotion changes must not restart the global fade or change user volume');
+    for (const {source, start, stop} of sources) {
+      assert.equal(source.started, start); assert.equal(source.stopped, stop);
+      assert.equal(source.disconnected, false);
+    }
   } finally { await engine.dispose(); globalThis.AudioContext = previous; }
 });
 

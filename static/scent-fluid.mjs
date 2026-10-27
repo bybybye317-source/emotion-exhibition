@@ -1,4 +1,4 @@
-import {CHANNELS} from './scent-math.mjs?v=20261028-flow';
+import {CHANNELS} from './scent-math.mjs?v=20261028-fast';
 
 const clamp = value => Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
 const smooth = value => { const x = clamp(value); return x * x * (3 - 2 * x); };

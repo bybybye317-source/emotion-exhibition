@@ -1,6 +1,7 @@
 const clamp01 = value => Math.max(0, Math.min(1, value));
 const smootherstep = value => {const x=clamp01(value);return x*x*x*(x*(x*6-15)+10);};
-const REVEAL_SECONDS=4.8, ARRIVAL_SECONDS=6.2, REDUCED_SECONDS=.65;
+const REVEAL_SECONDS=2.4, REDUCED_SECONDS=.65;
+export const ARRIVAL_SECONDS=3.2;
 
 /** A visible-time clock: callers can suspend it while the face is out of view. */
 export class FragmentArrival {
@@ -39,7 +40,7 @@ export class FragmentArrival {
       this._glow=0;
     } else {
       this._mix=smootherstep(this._elapsed/REVEAL_SECONDS);
-      this._glow=smootherstep(this._elapsed/.7)*(1-smootherstep((this._elapsed-3.8)/2.4));
+      this._glow=smootherstep(this._elapsed/.45)*(1-smootherstep((this._elapsed-1.8)/1.4));
     }
     if(this._elapsed>=end) {this._mix=1;this._glow=0;this._active=false;}
     return this.snapshot();

@@ -6,9 +6,12 @@ const MAX_VOICES = 64;
 const LOOKAHEAD = .16;
 const TICK_MS = 25;
 const OUTPUT_GAIN = .88;
+// AudioParam time constants: existing voices respond within a second, while
+// their sustained envelopes, note scheduling and reverb tails remain intact.
+const EMOTION_RESPONSE = Object.freeze({level: .30, color: .40, space: .45});
 const limit = value => Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
 
-function smooth(parameter, value, now, seconds = 1.2) {
+function smooth(parameter, value, now, seconds = EMOTION_RESPONSE.level) {
   if (typeof parameter.cancelAndHoldAtTime === 'function') parameter.cancelAndHoldAtTime(now);
   else { const current = parameter.value; parameter.cancelScheduledValues(now); parameter.setValueAtTime(current, now); }
   parameter.setTargetAtTime(value, now, seconds);
@@ -173,27 +176,27 @@ function makeGraph(context, parameters, volume, offline = false, samples = null)
     setSamples(bank) { samples = bank; },
     update(next, now, immediate = false) {
       if (Math.abs(next.space - previous.space) > .0005) {
-        smooth(wet.gain, .28 + .94 * next.space, now, immediate ? .015 : 1.1);
+        smooth(wet.gain, .28 + .94 * next.space, now, immediate ? .015 : EMOTION_RESPONSE.space);
         for (const echo of echoes) {
-          smooth(echo.feedback.gain, .12 + .30 * next.space, now, immediate ? .015 : 1.1);
-          smooth(echo.level.gain, .08 + .42 * next.space, now, immediate ? .015 : 1.1);
+          smooth(echo.feedback.gain, .12 + .30 * next.space, now, immediate ? .015 : EMOTION_RESPONSE.space);
+          smooth(echo.level.gain, .08 + .42 * next.space, now, immediate ? .015 : EMOTION_RESPONSE.space);
         }
       }
       if (Math.abs(motionFor(next) - motionFor(previous)) > .000005)
-        for (const echo of echoes) smooth(echo.depth.gain, motionFor(next), now, immediate ? .015 : 1.1);
+        for (const echo of echoes) smooth(echo.depth.gain, motionFor(next), now, immediate ? .015 : EMOTION_RESPONSE.space);
       for (const layer of MUSIC_LAYERS) {
-        if (Math.abs(next[layer] - previous[layer]) > .0005) smooth(layers[layer].gain.gain, next[layer], now, immediate ? .015 : .85);
+        if (Math.abs(next[layer] - previous[layer]) > .0005) smooth(layers[layer].gain.gain, next[layer], now, immediate ? .015 : EMOTION_RESPONSE.level);
         if (Math.abs(cutoffFor(layer, next) - cutoffFor(layer, previous)) > .05)
-          smooth(layers[layer].filter.frequency, cutoffFor(layer, next), now, immediate ? .015 : 1.0);
+          smooth(layers[layer].filter.frequency, cutoffFor(layer, next), now, immediate ? .015 : EMOTION_RESPONSE.color);
         if (Math.abs(sendFor(layer, next) - sendFor(layer, previous)) > .00005)
-          smooth(layers[layer].send.gain, sendFor(layer, next), now, immediate ? .015 : 1.1);
+          smooth(layers[layer].send.gain, sendFor(layer, next), now, immediate ? .015 : EMOTION_RESPONSE.space);
         if (Math.abs(echoFor(layer, next) - echoFor(layer, previous)) > .00005)
-          smooth(layers[layer].echoSend.gain, echoFor(layer, next), now, immediate ? .015 : 1.1);
+          smooth(layers[layer].echoSend.gain, echoFor(layer, next), now, immediate ? .015 : EMOTION_RESPONSE.space);
       }
       for (const voice of voices) {
         const amount = presenceFor(voice.event, next);
         if (Math.abs(amount - presenceFor(voice.event, previous)) > .00005)
-          smooth(voice.presence.gain, amount, now, immediate ? .015 : .8);
+          smooth(voice.presence.gain, amount, now, immediate ? .015 : EMOTION_RESPONSE.level);
       }
       previous = next;
     },

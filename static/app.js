@@ -1,5 +1,6 @@
 import {BrowserEmotionAnalyzer} from './browser-inference.mjs?v=20261027-sculpture';
 import {LocalSession, EMOTION_KEYS} from './session-state.mjs?v=20261027-fragments';
+import {CAPTURE_POLICY, CAPTURE_DURATION_LABEL, CaptureWindow} from './capture-window.mjs?v=20261028-fast';
 
 const $=id=>document.getElementById(id);
 const labels={happiness:'快乐',neutral:'中性',sadness:'悲伤',surprise:'惊讶',anger:'愤怒',fear:'恐惧',disgust:'厌恶',contempt:'轻蔑'};
@@ -33,7 +34,7 @@ function controls(){
   $('test-image').disabled=testingImage||capturing||!$('test-file').files.length;
   $('add-image').disabled=testingImage||!testedImage;
   $('start-camera').querySelector('span').textContent=state.camera.status==='starting'?'正在准备…':running?'摄像头已开启':'开启摄像头';
-  $('capture-label').textContent=capturing?'正在采集…':state.capture.status==='completed'?'采集下一位':'采集 3 秒';
+  $('capture-label').textContent=capturing?'正在采集…':state.capture.status==='completed'?'采集下一位':`采集 ${CAPTURE_DURATION_LABEL}`;
   $('test-image').textContent=testingImage?'正在分析…':'分析图片';
 }
 function render(){
@@ -66,7 +67,7 @@ async function ensureModel(){
 }
 const blobFromCanvas=canvas=>new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('照片生成失败')),'image/jpeg',.86));
 function cancelCapture(detail='采集已停止。'){
-  clearTimeout(captureTimer);captureTimer=null;captureRun=null;
+  clearTimeout(captureTimer);captureTimer=null;captureRun?.cancel();captureRun=null;
   if(state.capture.status==='capturing')state.capture={status:'idle',detail,progress:0};
 }
 function stopCamera(detail='摄像头已停止，照片记录仍保留在本轮。'){
@@ -79,18 +80,22 @@ async function cameraLoop(generation){
   const started=performance.now();
   try{
     if(video.readyState<2||!video.videoWidth){loopTimer=setTimeout(()=>cameraLoop(generation),100);return;}
+    // Bind the window before inference: a frame already in flight at the click cannot count.
+    const run=captureRun, frameStartedAt=performance.now();
     const scale=Math.min(1,960/video.videoWidth);frame.width=Math.round(video.videoWidth*scale);frame.height=Math.round(video.videoHeight*scale);frameContext.drawImage(video,0,0,frame.width,frame.height);
     const result=await analyzer.analyze(frame);
     if(disposed||generation!==cameraGeneration)return;
     state.live={...result,last_update:Date.now()/1000};
-    const run=captureRun;
-    if(run&&result.status==='ok'){
-      run.scores.push(result.scores);
-      if(!run.best||result.quality>run.best.quality){const blob=await blobFromCanvas(frame);if(captureRun===run&&generation===cameraGeneration)run.best={blob,anchors:result.photo_anchors,quality:result.quality};}
+    if(run&&captureRun===run){
+      const token=run.recordFrame({startedAt:frameStartedAt,completedAt:performance.now(),result});
+      if(token&&run.needsPhoto(token)){
+        const blob=await blobFromCanvas(frame);
+        if(!disposed&&captureRun===run&&generation===cameraGeneration)run.attachPhoto(token,blob,performance.now());
+      }
     }
     render();
   }catch(e){if(generation===cameraGeneration){state.live={status:'error',scores:{},detail:`识别失败：${e.message}`};render();}}
-  if(!disposed&&generation===cameraGeneration)loopTimer=setTimeout(()=>cameraLoop(generation),Math.max(40,250-(performance.now()-started)));
+  if(!disposed&&generation===cameraGeneration)loopTimer=setTimeout(()=>cameraLoop(generation),Math.max(CAPTURE_POLICY.minimumLoopDelayMs,CAPTURE_POLICY.frameIntervalMs-(performance.now()-started)));
 }
 $('start-camera').addEventListener('click',async()=>{
   if(pending()||stream)return;error();const generation=++cameraGeneration;state.camera={status:'starting',detail:'请允许浏览器使用摄像头。若一直等待，可检查系统权限或停止后用照片参与。'};render();
@@ -108,13 +113,23 @@ $('start-camera').addEventListener('click',async()=>{
 $('stop-camera').addEventListener('click',()=>stopCamera());
 $('capture').addEventListener('click',()=>{
   if(captureRun||state.camera.status!=='running'||state.live.status!=='ok')return;
-  const run={started:performance.now(),scores:[],best:null};captureRun=run;state.capture={status:'capturing',detail:'请保持一位观众正对镜头，采集 3 秒。',progress:0};render();
-  captureTimer=setTimeout(()=>{
-    if(captureRun!==run||disposed)return;captureRun=null;captureTimer=null;
-    if(run.scores.length<6||!run.best){state.capture={status:'rejected',progress:0,detail:`有效画面 ${run.scores.length} 帧，至少需要 6 帧。请保持稳定重试，或用照片参与。`};render();return;}
-    const scores=Object.fromEntries(EMOTION_KEYS.map(key=>[key,run.scores.reduce((sum,p)=>sum+(p[key]||0),0)/run.scores.length]));
-    session.add({scores,photoUrl:URL.createObjectURL(run.best.blob),anchors:run.best.anchors});state.capture={status:'completed',progress:1,detail:'采集完成，正在展示你贡献的片段。'};revealContribution();
-  },3000);
+  const run=new CaptureWindow({startedAt:performance.now(),scoreKeys:EMOTION_KEYS});
+  captureRun=run;state.capture={status:'capturing',detail:`请保持一位观众正对镜头，采集 ${CAPTURE_DURATION_LABEL}。`,progress:0};render();
+  const finishCapture=()=>{
+    if(captureRun!==run||disposed)return;
+    const result=run.finish(performance.now());
+    if(result.status==='pending'){captureTimer=setTimeout(finishCapture,result.remainingMs);return;}
+    captureRun=null;captureTimer=null;
+    if(result.status!=='completed'){
+      const detail=result.reason==='missing-photo'
+        ? '有效表情已采到，但未能在采集时间内取得清晰照片。请保持稳定重试。'
+        : `有效画面 ${result.frameCount||0} 帧，至少需要 ${CAPTURE_POLICY.minFrames} 帧。请保持稳定重试。`;
+      state.capture={status:'rejected',progress:0,detail};render();return;
+    }
+    session.add({scores:result.scores,photoUrl:URL.createObjectURL(result.photo.blob),anchors:result.photo.anchors});
+    state.capture={status:'completed',progress:1,detail:'采集完成，正在展示你贡献的片段。'};revealContribution();
+  };
+  captureTimer=setTimeout(finishCapture,CAPTURE_POLICY.durationMs);
 });
 $('reset-session').addEventListener('click',()=>{if(!session.records.length)return;if(confirm('清空当前浏览器本轮照片与记录？')){cancelCapture();session.reset();state.capture={status:'idle',detail:'本轮已清空，可以重新参与。',progress:0};render();}});
 function clearTest(){testedImage=null;$('add-image').disabled=true;if(testPreviewUrl)URL.revokeObjectURL(testPreviewUrl);testPreviewUrl=null;$('test-preview').removeAttribute('src');$('image-test-result').hidden=true;scoresToRows(imageRows,{});}
@@ -161,7 +176,7 @@ for(const [i,name] of views.entries()){
 }
 document.querySelectorAll('a[href="#scent-panel"]').forEach(link=>link.addEventListener('click',()=>selectView('scent')));
 window.addEventListener('emotion:state-request',emit);
-const tick=setInterval(()=>{if(captureRun){state.capture.progress=Math.min(1,(performance.now()-captureRun.started)/3000);render();}},100);
+const tick=setInterval(()=>{if(captureRun){state.capture.progress=captureRun.progress(performance.now());render();}},100);
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&(stream||state.camera.status==='starting'))stopCamera('页面离开前台，摄像头和本次采集已停止。');});
 window.addEventListener('pagehide',event=>{stopCamera();if(event.persisted)return;disposed=true;clearInterval(tick);session.reset();clearTest();analyzer.dispose?.();});
 selectHashView();render();

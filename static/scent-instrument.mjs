@@ -1,6 +1,6 @@
 import {ART, GEOMETRY} from './generated/scent-instrument-art.mjs?v=20261028-flow';
-import {deriveFluidState} from './scent-fluid.mjs?v=20261028-flow';
-import {PHASE_DURATIONS} from './scent-math.mjs?v=20261028-flow';
+import {deriveFluidState} from './scent-fluid.mjs?v=20261028-fast';
+import {PHASE_DURATIONS} from './scent-math.mjs?v=20261028-fast';
 
 const KEYS=Object.keys(GEOMETRY.channels);
 const ACTIVE_PHASES=new Set(['mixing','releasing','purging']);
@@ -238,9 +238,10 @@ export class ScentInstrument {
     this.outlet.style.stroke=fluid.color;
     this.outlet.style.opacity=String(fluid.release*.9);
     this.mist.forEach((cloud,index)=>{
-      const age=progress*(PHASE_DURATIONS.releasing/1000)-index*.44;
-      const u=this.motion.matches?.12+index*.11:clamp(age/4.4);
-      const envelope=this.motion.matches?Math.sin(Math.PI*u)**1.25:age>0&&age<4.4?Math.sin(Math.PI*u)**1.25:0;
+      // Scale the whole plume envelope with the phase, including each wisp's delay.
+      const age=progress-index*(.44/7), lifetime=4.4/7;
+      const u=this.motion.matches?.12+index*.11:clamp(age/lifetime);
+      const envelope=this.motion.matches?Math.sin(Math.PI*u)**1.25:age>0&&age<lifetime?Math.sin(Math.PI*u)**1.25:0;
       cloud.setAttribute('cx',GEOMETRY.outlet.x+Math.sin(u*5+index*.7)*u*16);
       cloud.setAttribute('cy',GEOMETRY.outlet.y-3-u*70);
       cloud.setAttribute('rx',2+u*23);

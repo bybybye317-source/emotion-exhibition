@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {createAlignedPhoto, paintCollage} from './portrait-collage.mjs?v=20261027-arrival';
-import {FragmentArrival, blendLinearPixels} from './portrait-arrival.mjs?v=20261027-arrival';
+import {ARRIVAL_SECONDS, FragmentArrival, blendLinearPixels} from './portrait-arrival.mjs?v=20261028-fast';
 import {LABELS, morphWeights, normalizeScores, organicFragmentCells, planPatchAssignments} from './portrait-math.mjs?v=20261027-arrival';
 
 const $ = id => document.getElementById(id);
@@ -389,7 +389,7 @@ class GroupPortrait {
     if(arrival.active) {
       const location=this.arrivalLocation();
       if($('portrait-arrival-location').textContent!==location)$('portrait-arrival-location').textContent=location;
-      note.style.opacity=String(this.reducedMotion.matches?1:Math.min(1,(6.2-arrival.elapsed)/.7));
+      note.style.opacity=String(this.reducedMotion.matches?1:Math.min(1,(ARRIVAL_SECONDS-arrival.elapsed)/.5));
     }
     this.stage.dataset.arrivalPhase=arrival.phase;
     this.stage.dataset.arrivalMix=arrival.mix.toFixed(3);
@@ -455,7 +455,7 @@ class GroupPortrait {
     if(wasActive||arrival.active)this.syncArrivalDisplay(arrival);
     if(wasActive&&!arrival.active){this.snapshotAppearance();this.paintArrivalMask([]);}
     if(document.hidden||rect.width<1)return;
-    const alpha=1-Math.exp(-delta/(this.reducedMotion.matches?.45:1.8));
+    const alpha=1-Math.exp(-delta/(this.reducedMotion.matches?.45:.65));
     for(const mesh of this.morphMeshes)for(const [name,index] of Object.entries(mesh.morphTargetDictionary)) {
       const step=((this.targetMorphs[name]||0)-mesh.morphTargetInfluences[index])*alpha;
       mesh.morphTargetInfluences[index]+=step;

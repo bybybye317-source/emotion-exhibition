@@ -1,4 +1,4 @@
-import {CHANNELS, EMOTIONS, SCENT_PROFILES, PHASE_DURATIONS, normalizeRecipe, recipeForScores} from './scent-math.mjs?v=20261028-flow';
+import {CHANNELS, EMOTIONS, SCENT_PROFILES, PHASE_DURATIONS, normalizeRecipe, recipeForScores} from './scent-math.mjs?v=20261028-fast';
 
 const zeroChannels = () => Object.fromEntries(CHANNELS.map(({key}) => [key, 0]));
 const copy = value => value == null ? null : JSON.parse(JSON.stringify(value));
@@ -58,7 +58,7 @@ export class ScentSimulator {
   _smooth(at) {
     if (!this._target || !this._smoothed) { this._smoothAt = at; return; }
     const delta = Math.max(0, at - (this._smoothAt ?? at));
-    const amount = 1 - Math.exp(-delta / 6000);
+    const amount = 1 - Math.exp(-delta / 1800);
     if (this._smoothedWeights && this._target.emotionWeights) {
       for (const emotion of EMOTIONS) {
         this._smoothedWeights[emotion] += amount * (this._target.emotionWeights[emotion] - this._smoothedWeights[emotion]);

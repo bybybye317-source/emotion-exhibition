@@ -37,10 +37,10 @@ test('simulator remains stopped until explicitly started; start without data onl
   assert.equal(engine.snapshot().cycles, 1);
 });
 
-test('default 29-second cycle follows prepare/release/purge/wait with output only during release', () => {
+test('default 13-second cycle follows prepare/release/purge/wait with output only during release', () => {
   const {engine, driver, advance} = setup();
   engine.setTarget(happy()); engine.start();
-  assert.equal(CYCLE, 29000);
+  assert.equal(CYCLE, 13000);
   assert.deepEqual(advance(RELEASE_AT - 1).outputs, zeros);
   const release = advance(RELEASE_AT);
   assert.equal(release.phase, 'releasing');
@@ -66,7 +66,7 @@ test('new emotion is smoothed and pending while active recipe stays latched thro
   engine.setTarget(happy()); engine.start(); advance(INTO_RELEASE);
   engine.setTarget(sad());
   assert.equal(engine.snapshot().pending, true);
-  const halfway = advance(INTO_RELEASE + 4000);
+  const halfway = advance(INTO_RELEASE + 2000);
   assert.deepEqual(halfway.activeRecipe, happy());
   assert.equal(halfway.activeRecipe.emotionWeights.happiness, 1);
   assert.equal(halfway.activeRecipe.contributions.bergamot.sadness, 0);
@@ -90,9 +90,9 @@ test('repeating targets does not restart cycles or slow exponential convergence'
   for (let time = 1200; time <= 7000; time += 200) { a.advance(time); a.engine.setTarget(sad()); }
   b.advance(7000);
   assert.deepEqual(a.engine.snapshot().smoothedRecipe, b.engine.snapshot().smoothedRecipe);
-  assert.equal(a.engine.snapshot().smoothedRecipe.percentages.bergamot, 15);
-  assert.equal(a.engine.snapshot().phase, 'mixing');
-  assert.equal(a.engine.snapshot().remaining, (D.mixing - 7000) / 1000);
+  assert.ok(a.engine.snapshot().smoothedRecipe.emotionWeights.sadness > .96);
+  assert.equal(a.engine.snapshot().phase, 'releasing');
+  assert.equal(a.engine.snapshot().remaining, (PURGE_AT - 7000) / 1000);
   assert.equal(a.engine.snapshot().cycles, 1);
 });
 
@@ -201,7 +201,7 @@ test('smoothing follows all emotion weights rather than attaching the newest sou
   const second = recipeForScores({sadness: 2, anger: 1, surprise: 1});
   engine.setTarget(first); engine.start(); advance(1000); engine.setTarget(second);
   const state = advance(7000);
-  const retained = Math.exp(-1);
+  const retained = Math.exp(-6000 / 1800);
   for (const emotion of EMOTIONS) {
     const expected = first.emotionWeights[emotion] * retained + second.emotionWeights[emotion] * (1 - retained);
     assert.ok(Math.abs(state.smoothedRecipe.emotionWeights[emotion] - expected) < 1e-8);

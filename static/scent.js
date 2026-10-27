@@ -1,7 +1,7 @@
-import {recipeForScores, CHANNELS, EMOTION_LABELS, explainIngredient} from './scent-math.mjs?v=20261028-flow';
-import {ScentSimulator} from './scent-engine.mjs?v=20261028-flow';
-import {deriveFluidState} from './scent-fluid.mjs?v=20261028-flow';
-import {ScentInstrument} from './scent-instrument.mjs?v=20261028-flow';
+import {recipeForScores, CHANNELS, EMOTION_LABELS, explainIngredient} from './scent-math.mjs?v=20261028-fast';
+import {ScentSimulator} from './scent-engine.mjs?v=20261028-fast';
+import {deriveFluidState} from './scent-fluid.mjs?v=20261028-fast';
+import {ScentInstrument} from './scent-instrument.mjs?v=20261028-fast';
 
 const $ = id => document.getElementById(id);
 const phaseLabels = {stopped:'尚未开启',idle:'等待数据',mixing:'调配中',releasing:'模拟释放中',purging:'模拟清味中',waiting:'等待下一轮'};

@@ -25,7 +25,23 @@ test('anchors retain full-frame coordinates and sort eyes by image x', () => {
   marks[33] = marks[133] = {x: .7, y: .3};
   marks[263] = marks[362] = {x: .3, y: .3};
   marks[1] = {x: .5, y: .55}; marks[13] = {x: .45, y: .7}; marks[14] = {x: .55, y: .7};
-  assert.deepEqual(alignmentAnchors(marks), {left_eye: [.3, .3], right_eye: [.7, .3], nose: [.5, .55], mouth: [.5, .7]});
+  const anchors=alignmentAnchors(marks);
+  assert.deepEqual(Object.fromEntries(['left_eye','right_eye','nose','mouth'].map(key=>[key,anchors[key]])), {left_eye: [.3, .3], right_eye: [.7, .3], nose: [.5, .55], mouth: [.5, .7]});
+});
+
+test('lip anchors distinguish tissue from an open photographed mouth and sort corners', () => {
+  const marks = Array.from({length:478},()=>({x:.5,y:.5}));
+  marks[61]={x:.7,y:.68};marks[291]={x:.3,y:.67};
+  marks[0]={x:.50,y:.64};marks[13]={x:.50,y:.68};
+  marks[14]={x:.51,y:.77};marks[17]={x:.51,y:.82};
+  const anchors=alignmentAnchors(marks);
+  assert.deepEqual(anchors.mouth_left,[.3,.67]);assert.deepEqual(anchors.mouth_right,[.7,.68]);
+  assert.deepEqual(anchors.mouth_upper_outer,[.50,.64]);assert.deepEqual(anchors.mouth_upper_inner,[.50,.68]);
+  assert.deepEqual(anchors.mouth_lower_inner,[.51,.77]);assert.deepEqual(anchors.mouth_lower_outer,[.51,.82]);
+  assert(Math.abs(anchors.mouth[0]-.505)<1e-12);assert(Math.abs(anchors.mouth[1]-.725)<1e-12);
+  assert.equal(anchors.mouth_upper_contour.length,11);assert.equal(anchors.mouth_lower_contour.length,11);
+  assert(anchors.mouth_upper_contour.some(p=>p[0]===.5&&p[1]===.68));
+  assert(anchors.mouth_lower_contour.some(p=>p[0]===.51&&p[1]===.77));
 });
 
 test('flat image has no sharpness while visible edges have positive sharpness', () => {

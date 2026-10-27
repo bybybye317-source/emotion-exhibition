@@ -1,4 +1,4 @@
-import {BrowserEmotionAnalyzer} from './browser-inference.mjs';
+import {BrowserEmotionAnalyzer} from './browser-inference.mjs?v=20261027-sculpture';
 import {LocalSession, EMOTION_KEYS} from './session-state.mjs';
 
 const $=id=>document.getElementById(id);

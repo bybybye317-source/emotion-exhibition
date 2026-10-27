@@ -1,0 +1,238 @@
+{
+  "name": "Collective Sculpture",
+  "source": "https://raw.githubusercontent.com/hizzlehoff/FaceCapCustomAvatarExporter/86a89d247624e7b5e393e4336709e490db717382/Examples/Example.FCA",
+  "sourceCommit": "86a89d247624e7b5e393e4336709e490db717382",
+  "sourceSha256": "2e568ce11eab383515623c88190cb640c55608e43090c4c2a44c7a816f25c505",
+  "license": "MIT",
+  "author": "Niels J. / Face Cap",
+  "authorPage": "https://www.bannaflak.com/face-cap/importavatar.html",
+  "coordinates": "+Y up; +Z front; x<0 is viewer left; mask occupies y=-1.2..1.2",
+  "construction": "Original open face mask with two Loop subdivision passes; 43 expressions (eight unused eyeLook channels omitted); sparse position and normal deltas; separate subdivided eyes; textures omitted.",
+  "bounds": {
+    "left": -1.0157996277653742,
+    "right": 1.0161515359412459,
+    "top": 1.2,
+    "bottom": -1.2
+  },
+  "landmarks": {
+    "left_eye": [
+      -0.3706543744343991,
+      0.35011965677139173
+    ],
+    "right_eye": [
+      0.3765250700697892,
+      0.3451562504614711
+    ],
+    "nose": [
+      0.0072983420739963,
+      -0.06832751713111457
+    ],
+    "mouth": [
+      0.005993998659959419,
+      -0.49762807459445063
+    ],
+    "mouth_left": [
+      -0.26975188606733996,
+      -0.5225286979749825
+    ],
+    "mouth_right": [
+      0.2819827652590647,
+      -0.5231754138168901
+    ],
+    "mouth_upper_inner": [
+      0.005569741982641019,
+      -0.49257168603894963
+    ],
+    "mouth_lower_inner": [
+      0.00641825533727782,
+      -0.5026844631499516
+    ],
+    "mouth_upper_outer": [
+      0.005877783833245312,
+      -0.43239633032878294
+    ],
+    "mouth_lower_outer": [
+      0.006640599008312507,
+      -0.5985180454572383
+    ]
+  },
+  "landmarks3d": {
+    "left_eye": [
+      -0.3706543744343991,
+      0.35011965677139173,
+      0.30020602680971853
+    ],
+    "right_eye": [
+      0.3765250700697892,
+      0.3451562504614711,
+      0.30020602680971853
+    ],
+    "nose": [
+      0.0072983420739963,
+      -0.06832751713111457,
+      0.8091953383980359
+    ],
+    "mouth": [
+      0.005993998659959419,
+      -0.49762807459445063,
+      0.5390389600572133
+    ],
+    "mouth_left": [
+      -0.26975188606733996,
+      -0.5225286979749825,
+      0.42313903380074336
+    ],
+    "mouth_right": [
+      0.2819827652590647,
+      -0.5231754138168901,
+      0.4236292190903597
+    ],
+    "mouth_upper_inner": [
+      0.005569741982641019,
+      -0.49257168603894963,
+      0.5344187495175878
+    ],
+    "mouth_lower_inner": [
+      0.00641825533727782,
+      -0.5026844631499516,
+      0.5436591705968388
+    ],
+    "mouth_upper_outer": [
+      0.005877783833245312,
+      -0.43239633032878294,
+      0.6101933497068387
+    ],
+    "mouth_lower_outer": [
+      0.006640599008312507,
+      -0.5985180454572383,
+      0.5767453948864558
+    ]
+  },
+  "landmarkVertexIndices": {
+    "left_eye": 10870,
+    "right_eye": 4615,
+    "nose": 7,
+    "mouth": 18909,
+    "mouth_left": 394,
+    "mouth_right": 824,
+    "mouth_upper_inner": 24,
+    "mouth_lower_inner": 25,
+    "mouth_upper_outer": 21,
+    "mouth_lower_outer": 28
+  },
+  "mouthLandmarkMethod": "Refined coordinates of source vertices: lip-to-cheek junctions 394/824, upper/lower inner lip sheets 24/25, upper/lower outer lip crests 21/28. Mouth center is the midpoint of 24 and 25. The source has a closed mouth interior, not a boundary hole.",
+  "meshes": [
+    {
+      "name": "SculptureHead",
+      "vertices": 18911,
+      "triangles": 37408,
+      "morphs": 43,
+      "bounds": {
+        "min": [
+          -1.0157996277653742,
+          -1.2,
+          -0.5521464296591045
+        ],
+        "max": [
+          1.0161515359412459,
+          1.2,
+          0.7993551216659626
+        ]
+      }
+    },
+    {
+      "name": "EyeLeft",
+      "vertices": 1922,
+      "triangles": 3840,
+      "morphs": 0,
+      "bounds": {
+        "min": [
+          0.14053811582844958,
+          0.10849124929129968,
+          -0.15732296834963297
+        ],
+        "max": [
+          0.6136377969116653,
+          0.5818212516316424,
+          0.31227180737057914
+        ]
+      }
+    },
+    {
+      "name": "EyeRight",
+      "vertices": 1922,
+      "triangles": 3840,
+      "morphs": 0,
+      "bounds": {
+        "min": [
+          -0.6077671012762751,
+          0.11345465560122037,
+          -0.15618885669279628
+        ],
+        "max": [
+          -0.13466742019305947,
+          0.5867846579415631,
+          0.31340591902741577
+        ]
+      }
+    }
+  ],
+  "morphNames": [
+    "browInnerUp",
+    "browDown_L",
+    "browDown_R",
+    "browOuterUp_L",
+    "browOuterUp_R",
+    "eyeBlink_L",
+    "eyeBlink_R",
+    "eyeSquint_L",
+    "eyeSquint_R",
+    "eyeWide_L",
+    "eyeWide_R",
+    "cheekPuff",
+    "cheekSquint_L",
+    "cheekSquint_R",
+    "noseSneer_L",
+    "noseSneer_R",
+    "jawOpen",
+    "jawForward",
+    "jaw_L",
+    "jaw_R",
+    "mouthFunnel",
+    "mouthPucker",
+    "mouth_L",
+    "mouth_R",
+    "mouthRollUpper",
+    "mouthRollLower",
+    "mouthShrugUpper",
+    "mouthShrugLower",
+    "mouthClose",
+    "mouthSmile_L",
+    "mouthSmile_R",
+    "mouthFrown_L",
+    "mouthFrown_R",
+    "mouthDimple_L",
+    "mouthDimple_R",
+    "mouthUpperUp_L",
+    "mouthUpperUp_R",
+    "mouthLowerDown_L",
+    "mouthLowerDown_R",
+    "mouthPress_L",
+    "mouthPress_R",
+    "mouthStretch_L",
+    "mouthStretch_R"
+  ],
+  "sourceMorphCount": 51,
+  "omittedMorphs": [
+    "eyeLookUp_L",
+    "eyeLookUp_R",
+    "eyeLookDown_L",
+    "eyeLookDown_R",
+    "eyeLookIn_L",
+    "eyeLookIn_R",
+    "eyeLookOut_L",
+    "eyeLookOut_R"
+  ],
+  "glbBytes": 12282556,
+  "glbSha256": "988d11647220d7f8142c1aecb7669c39c72cb361cdac39a05587c868e6ce803d"
+}

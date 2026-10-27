@@ -1,52 +1,16 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-import {headGeometryData, HEAD_ANCHORS, faceSurface, expressionDetails} from './procedural-head.mjs';
-import {LABELS, morphWeights, normalizeScores, voronoiCells, affineFromTriangles, photoTriangle} from './portrait-math.mjs';
+import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {createAlignedPhoto, paintCollage} from './portrait-collage.mjs';
+import {LABELS, morphWeights, normalizeScores} from './portrait-math.mjs';
 
 const $ = id => document.getElementById(id);
 const SIZE = 1024;
-const BOUNDS = {left:-.90, right:.90, top:1.26, bottom:-.95};
-const project = (x,y) => [(x-BOUNDS.left)/(BOUNDS.right-BOUNDS.left)*SIZE, (BOUNDS.top-y)/(BOUNDS.top-BOUNDS.bottom)*SIZE];
-const TARGET = Object.fromEntries(Object.entries(HEAD_ANCHORS).map(([key,point])=>[key,project(...point)]));
-const BASE_COLOR = '#dce2df';
+const BASE_COLOR = '#aeb0ae';
+const MODEL_URL = new URL('./models/sculpture-head.glb', import.meta.url);
 const clamp01 = value => Math.min(1,Math.max(0,value));
 const smooth = (a,b,x) => {const t=clamp01((x-a)/(b-a));return t*t*(3-2*t);};
 const canvas = () => Object.assign(document.createElement('canvas'), {width:SIZE,height:SIZE});
-
-function path(ctx, points) {
-  ctx.beginPath();
-  points.forEach(([x,y],i) => i ? ctx.lineTo(x,y) : ctx.moveTo(x,y));
-  ctx.closePath();
-}
-
-function alignedPhoto(image, anchors) {
-  const output=canvas(), ctx=output.getContext('2d');
-  const source=photoTriangle(anchors,image.width,image.height);
-  const target=[TARGET.left_eye,TARGET.right_eye,TARGET.mouth];
-  const transform=affineFromTriangles(source,target);
-  if(!transform) return output;
-  ctx.fillStyle=BASE_COLOR;ctx.fillRect(0,0,SIZE,SIZE);
-  // The base affine aligns both eyes and mouth. Four-point piecewise warping
-  // also aligns the nose without requiring reconstruction of an individual's head.
-  const inverse=affineFromTriangles(target,source);
-  const corners=[[0,0],[SIZE,0],[SIZE,SIZE],[0,SIZE]];
-  const toSource=([x,y]) => [inverse[0]*x+inverse[2]*y+inverse[4],inverse[1]*x+inverse[3]*y+inverse[5]];
-  const nose=anchors?.nose;
-  const validNose=Array.isArray(nose) && nose.length===2 && nose.every(v=>Number.isFinite(v)&&v>=0&&v<=1);
-  if(!validNose) {
-    ctx.setTransform(...transform);ctx.drawImage(image,0,0);return output;
-  }
-  const src=[...corners.map(toSource),source[0],source[1],[nose[0]*image.width,nose[1]*image.height],source[2]];
-  const dst=[...corners,target[0],target[1],TARGET.nose,target[2]];
-  const triangles=[[0,1,5],[0,5,4],[0,4,3],[1,2,5],[2,7,5],[2,3,7],[3,4,7],[4,5,6],[5,7,6],[7,4,6]];
-  for(const triangle of triangles) {
-    const matrix=affineFromTriangles(triangle.map(i=>src[i]),triangle.map(i=>dst[i]));
-    if(!matrix) continue;
-    ctx.save();path(ctx,triangle.map(i=>dst[i]));ctx.clip();
-    ctx.setTransform(...matrix);ctx.drawImage(image,0,0);ctx.restore();
-  }
-  return output;
-}
 
 class GroupPortrait {
   constructor(stage) {
@@ -58,24 +22,26 @@ class GroupPortrait {
     this.texture=new THREE.CanvasTexture(this.atlas);this.texture.colorSpace=THREE.SRGBColorSpace;
     this.texture.anisotropy=4;this.texture.flipY=true;
     this.photoUniform={value:0};
+    this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
     this.scene=new THREE.Scene();
     this.scene.background=new THREE.Color(getComputedStyle(stage).getPropertyValue('--portrait-stage-bg').trim() || '#080a0d');
-    this.camera=new THREE.PerspectiveCamera(35,1,.05,60);
+    this.camera=new THREE.PerspectiveCamera(32,1,.05,60);
     this.renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:'high-performance'});
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.7));
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;
-    this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.12;
+    this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.0;
     this.renderer.domElement.setAttribute('aria-label','由观众照片构成的三维群体脸，可拖动旋转');
     this.renderer.domElement.setAttribute('role','img');this.stage.append(this.renderer.domElement);
     this.renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();this.failure='图形显示中断，请刷新页面恢复';this.updateStatus();});
     this.renderer.domElement.addEventListener('webglcontextrestored',()=>location.reload());
     this.controls=new OrbitControls(this.camera,this.renderer.domElement);
     this.controls.enableDamping=true;this.controls.dampingFactor=.08;this.controls.enablePan=false;
-    this.controls.minDistance=3.5;this.controls.maxDistance=10;
-    this.controls.minPolarAngle=.45;this.controls.maxPolarAngle=Math.PI-.65;
-    this.controls.autoRotateSpeed=.65;
-    this.scene.add(new THREE.HemisphereLight(0xffffff,0x9bada6,2.0));
-    for(const [color,intensity,position] of [[0xfff7e9,2.7,[-3,4,5]],[0xd8eeee,1.0,[3,1,3]],[0xffffff,1.8,[-1,3,-4]]]) {
+    this.controls.minDistance=3.8;this.controls.maxDistance=11;
+    this.controls.minPolarAngle=1.12;this.controls.maxPolarAngle=1.97;
+    this.controls.minAzimuthAngle=-.85;this.controls.maxAzimuthAngle=.85;
+    this.controls.autoRotateSpeed=.30;
+    this.scene.add(new THREE.HemisphereLight(0xe8e5de,0x151922,.32));
+    for(const [color,intensity,position] of [[0xf1ede4,2.9,[-4,3,4]],[0xbecddd,.48,[3,.5,3]],[0xdce7f4,2.2,[3,2,-2]]]) {
       const light=new THREE.DirectionalLight(color,intensity);light.position.set(...position);this.scene.add(light);
     }
     this.resetView();
@@ -90,151 +56,79 @@ class GroupPortrait {
 
   clearAtlas() {this.atlasContext.fillStyle=BASE_COLOR;this.atlasContext.fillRect(0,0,SIZE,SIZE);}
 
-  loadModel() {
+  async loadModel() {
+    if(this.modelLoading||this.ready||this.disposed)return;
+    this.modelLoading=true;this.failure=null;this.stage.dataset.model='loading';this.updateStatus();
+    $('portrait-retry-model').hidden=true;
+    let candidate=null;
     try {
-      this.model=new THREE.Group();
-      this.model.name='original-parametric-group-portrait';
-      const data=headGeometryData();
-      const geometry=new THREE.BufferGeometry();
-      geometry.setAttribute('position',new THREE.BufferAttribute(data.positions,3));
-      geometry.setAttribute('uv',new THREE.BufferAttribute(data.uv,2));
-      geometry.setIndex(new THREE.BufferAttribute(data.indices,1));
-      geometry.computeVertexNormals();
-      geometry.morphTargetsRelative=true;
-      geometry.morphAttributes.position=Object.entries(data.morphs).map(([name,values])=>{
-        const attribute=new THREE.BufferAttribute(values,3);attribute.name=name;return attribute;
+      const gltf=await new GLTFLoader().loadAsync(MODEL_URL.href);
+      if(this.disposed){gltf.scene.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});return;}
+      candidate=gltf.scene;
+      this.projection=candidate.userData;
+      // Projection is calibrated from the neutral asset, and remains attached
+      // to vertices during expression morphing instead of sliding over the face.
+      if(!this.projection.bounds||!this.projection.landmarks)throw new Error('缺少脸模的照片校准数据');
+      this.morphMeshes=[];
+      candidate.traverse(mesh=>{
+        if(!mesh.isMesh)return;
+        const geometry=mesh.geometry;
+        const points=geometry.attributes.position;
+        const uv=new Float32Array(points.count*2),weights=new Float32Array(points.count);
+        const {left,right,top,bottom}=this.projection.bounds;
+        for(let i=0;i<points.count;i++) {
+          const x=points.getX(i),y=points.getY(i);
+          const u=(x-left)/(right-left),v=(y-bottom)/(top-bottom);
+          uv[i*2]=u;uv[i*2+1]=v;
+          weights[i]=smooth(.02,.17,u)*(1-smooth(.83,.98,u))*smooth(.015,.13,v)*(1-smooth(.85,.99,v));
+        }
+        geometry.setAttribute('uv',new THREE.BufferAttribute(uv,2));
+        geometry.setAttribute('portraitWeight',new THREE.BufferAttribute(weights,1));
+        mesh.material?.dispose();
+        geometry.computeBoundingBox();
+        mesh.material=this.sculptureMaterial(mesh.name.startsWith('Eye')?geometry.boundingBox.getCenter(new THREE.Vector3()):null);
+        mesh.frustumCulled=false;
+        if(mesh.morphTargetDictionary&&Object.keys(mesh.morphTargetDictionary).length){this.morphMeshes.push(mesh);this.head=mesh;}
       });
-      const weights=new Float32Array(data.positions.length/3);
-      for(let i=0;i<weights.length;i++) {
-        const [x,y,z]=data.positions.subarray(i*3,i*3+3);
-        weights[i]=smooth(-.12,.22,z)*(1-smooth(.66,.83,Math.abs(x)))*smooth(-1.0,-.84,y)*(1-smooth(1.15,1.38,y));
-      }
-      geometry.setAttribute('portraitWeight',new THREE.BufferAttribute(weights,1));
-      const material=new THREE.MeshStandardMaterial({color:0xffffff,map:this.texture,roughness:.86,metalness:0});
-      material.onBeforeCompile=shader=>{
-        shader.uniforms.portraitPhotoMix=this.photoUniform;
-        shader.uniforms.portraitBaseColor={value:new THREE.Color(BASE_COLOR)};
-        shader.vertexShader='attribute float portraitWeight;\nvarying float vPortraitWeight;\n'+shader.vertexShader;
-        shader.vertexShader=shader.vertexShader.replace('#include <uv_vertex>','#include <uv_vertex>\nvPortraitWeight = portraitWeight;');
-        shader.fragmentShader='uniform float portraitPhotoMix;\nuniform vec3 portraitBaseColor;\nvarying float vPortraitWeight;\n'+shader.fragmentShader;
-        shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>','vec4 portraitSample = texture2D(map, vMapUv);\ndiffuseColor.rgb *= mix(portraitBaseColor, portraitSample.rgb, vPortraitWeight * portraitPhotoMix);');
-      };
-      material.customProgramCacheKey=()=> 'original-parametric-collage-v1';
-      this.head=new THREE.Mesh(geometry,material);this.head.name='parametric-face';
-      this.head.frustumCulled=false;this.morphMeshes=[this.head];this.model.add(this.head);
-      this.buildDetails();
+      this.model=candidate;candidate=null;
       this.scene.add(this.model);this.ready=true;
-      this.stage.dataset.model='ready';this.stage.dataset.geometry='original-parametric';this.updateStatus();
+      this.stage.dataset.model='ready';this.stage.dataset.geometry='sculpted-expression-mask';
+      this.loadPhotos(this.records);this.updateStatus();
     } catch(error) {
-      this.failure=`三维模型加载失败：${error.message}`;this.stage.dataset.model='error';this.updateStatus();
-    }
+      candidate?.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});
+      this.morphMeshes=[];this.head=null;
+      this.failure=`三维肖像暂未加载成功：${error.message}`;
+      this.stage.dataset.model='error';$('portrait-retry-model').hidden=false;this.updateStatus();
+    } finally {this.modelLoading=false;}
   }
 
-  // Small original surfaces establish the eyes, lids, mouth and ears. Their
-  // geometry is updated in place, with the same eased weights as the head.
-  buildDetails() {
-    const clay=new THREE.MeshStandardMaterial({color:BASE_COLOR,roughness:.86});
-    const crease=new THREE.MeshStandardMaterial({color:0x89988f,roughness:.95});
-    const lidMaterial=new THREE.MeshStandardMaterial({color:0xc8d1ca,roughness:.88});
-    const globeMaterial=new THREE.MeshStandardMaterial({color:0xe4e8dd,roughness:.55});
-    const irisMaterial=new THREE.MeshStandardMaterial({color:0x687f76,roughness:.62});
-    const pupilMaterial=new THREE.MeshStandardMaterial({color:0x263b34,roughness:.6});
-    const sphere=(material,position,scale)=>{
-      const mesh=new THREE.Mesh(new THREE.SphereGeometry(1,32,20),material);
-      mesh.position.set(...position);mesh.scale.set(...scale);this.model.add(mesh);return mesh;
+  sculptureMaterial(eyeCenter=null) {
+    const material=new THREE.MeshStandardMaterial({color:0xffffff,map:this.texture,roughness:.72,metalness:.035,side:THREE.DoubleSide});
+    material.onBeforeCompile=shader=>{
+      shader.uniforms.portraitPhotoMix=this.photoUniform;
+      shader.uniforms.portraitEyeCenter={value:eyeCenter||new THREE.Vector3(10,10,10)};
+      shader.uniforms.portraitBaseColor={value:new THREE.Color(BASE_COLOR)};
+      shader.vertexShader='attribute float portraitWeight;\nvarying float vPortraitWeight;\nvarying vec3 vSculpturePosition;\n'+shader.vertexShader;
+      shader.vertexShader=shader.vertexShader.replace('#include <uv_vertex>','#include <uv_vertex>\nvPortraitWeight = portraitWeight;\nvSculpturePosition = position;');
+      shader.fragmentShader='uniform vec3 portraitEyeCenter;\nuniform float portraitPhotoMix;\nuniform vec3 portraitBaseColor;\nvarying float vPortraitWeight;\nvarying vec3 vSculpturePosition;\n'+shader.fragmentShader;
+      shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',`
+        vec3 photograph = texture2D(map, vMapUv).rgb;
+        // Quiet mineral variation, evaluated in object space so it stays on the sculpture.
+        float grain = fract(sin(dot(floor(vSculpturePosition * 380.0), vec3(12.9898,78.233,39.425))) * 43758.5453);
+        vec3 stone = portraitBaseColor * (0.975 + grain * 0.05);
+        float eyeRadius = length(vSculpturePosition.xy - portraitEyeCenter.xy);
+        float iris = 1.0-smoothstep(0.050,0.060,eyeRadius);
+        float pupil = 1.0-smoothstep(0.018,0.026,eyeRadius);
+        stone *= 1.0 - iris*0.24 - pupil*0.32;
+        diffuseColor.rgb *= mix(stone, photograph, vPortraitWeight * portraitPhotoMix * 0.94);
+      `);
     };
-    this.eyeDetails=[];this.curves=[];
-    const curve=(material,radius=.012)=>{
-      const steps=32,sides=6,positions=new Float32Array((steps+1)*sides*3),normals=new Float32Array(positions.length),indices=[];
-      for(let i=0;i<steps;i++)for(let j=0;j<sides;j++) {
-        const a=i*sides+j,b=i*sides+(j+1)%sides,c=b+sides,d=a+sides;
-        indices.push(a,b,d,b,c,d);
-      }
-      const geometry=new THREE.BufferGeometry();
-      geometry.setAttribute('position',new THREE.BufferAttribute(positions,3).setUsage(THREE.DynamicDrawUsage));
-      geometry.setAttribute('normal',new THREE.BufferAttribute(normals,3).setUsage(THREE.DynamicDrawUsage));
-      geometry.setIndex(indices);
-      const mesh=new THREE.Mesh(geometry,material);mesh.frustumCulled=false;this.model.add(mesh);
-      const detail={mesh,steps,sides,radius,positions,normals};this.curves.push(detail);return detail;
-    };
-    for(const side of [-1,1]) {
-      sphere(clay,[side*.79,.11,-.19],[.105,.23,.125]);
-      sphere(lidMaterial,[side*.815,.10,-.078],[.041,.13,.018]);
-      const x=side*.329,y=.261213,z=faceSurface(x,y)+.025;
-      const globe=sphere(globeMaterial,[x,y,z],[.145,.087,.076]);
-      const iris=sphere(irisMaterial,[x,y,z+.070],[.052,.052,.008]);
-      const pupil=sphere(pupilMaterial,[x,y,z+.078],[.023,.023,.004]);
-      this.eyeDetails.push({side,x,y,z,globe,iris,pupil,upper:curve(lidMaterial,.012),lower:curve(lidMaterial,.009),brow:curve(crease,.016)});
-      sphere(crease,[side*.083,-.137,faceSurface(side*.083,-.137)+.003],[.020,.010,.008]);
-    }
-    const mouthGeometry=new THREE.BufferGeometry(),mouthIndices=[];
-    mouthGeometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(33*2*3),3).setUsage(THREE.DynamicDrawUsage));
-    for(let i=0;i<32;i++) {const a=i*2;mouthIndices.push(a,a+1,a+2,a+1,a+3,a+2);}
-    mouthGeometry.setIndex(mouthIndices);
-    this.mouthInterior=new THREE.Mesh(mouthGeometry,new THREE.MeshStandardMaterial({color:0x46584f,roughness:1,side:THREE.DoubleSide}));
-    this.mouthInterior.frustumCulled=false;this.model.add(this.mouthInterior);
-    this.upperLip=curve(lidMaterial,.016);this.lowerLip=curve(lidMaterial,.019);
-    this.facialMaterials=[crease,lidMaterial,globeMaterial,irisMaterial,pupilMaterial,this.mouthInterior.material];
-    for(const material of this.facialMaterials) {material.transparent=true;material.depthWrite=false;}
-    this.updateDetails();
-  }
-
-  updateCurve(curve,point) {
-    const {steps,sides,radius,positions,normals}=curve;
-    for(let i=0;i<=steps;i++) {
-      const t=i/steps,p=point(t),a=point(Math.max(0,t-.002)),b=point(Math.min(1,t+.002));
-      const dx=b[0]-a[0],dy=b[1]-a[1],length=Math.max(1e-8,Math.hypot(dx,dy));
-      for(let j=0;j<sides;j++) {
-        const angle=j/sides*Math.PI*2,nx=-dy/length*Math.sin(angle),ny=dx/length*Math.sin(angle),nz=Math.cos(angle);
-        const index=(i*sides+j)*3;
-        positions[index]=p[0]+nx*radius;positions[index+1]=p[1]+ny*radius;positions[index+2]=p[2]+nz*radius;
-        normals[index]=nx;normals[index+1]=ny;normals[index+2]=nz;
-      }
-    }
-    curve.mesh.geometry.attributes.position.needsUpdate=true;
-    curve.mesh.geometry.attributes.normal.needsUpdate=true;
-  }
-
-  updateDetails() {
-    const weights=Object.fromEntries(Object.entries(this.head.morphTargetDictionary).map(([name,index])=>[name,this.head.morphTargetInfluences[index]]));
-    const expression=expressionDetails(weights);
-    for(let i=0;i<this.eyeDetails.length;i++) {
-      const eye=this.eyeDetails[i],p=expression.sides[i],halfWidth=.148,halfHeight=.068*p.eye;
-      eye.globe.scale.y=.087*p.eye;
-      // The iris remains round while lids narrow; the spherical surface itself
-      // is clipped visually by the lids and the recessed eye socket.
-      eye.iris.scale.y=.052*Math.min(1,p.eye);eye.pupil.scale.y=.023*Math.min(1,p.eye);
-      const lidPoint=(t,sign)=>{
-        const x=eye.x+(2*t-1)*halfWidth,y=eye.y+sign*halfHeight*Math.sin(Math.PI*t);
-        const z=eye.z+.025+.05*Math.sin(Math.PI*t);
-        return [x,y,z];
-      };
-      this.updateCurve(eye.upper,t=>lidPoint(t,1));this.updateCurve(eye.lower,t=>lidPoint(t,-1));
-      this.updateCurve(eye.brow,t=>{
-        const x=eye.side*(.16+.34*t),baseY=.425+.025*Math.sin(Math.PI*t),y=baseY+p.browInner*(1-t)+p.browOuter*t;
-        return [x,y,faceSurface(x,baseY)+.030];
-      });
-    }
-    const {mouthWidth:width,mouthHeight:height,mouthY:y,jaw,funnel}=expression;
-    const lipPoint=(t,upper)=>{
-      const x=(2*t-1)*width,side=t<.5?expression.sides[0]:expression.sides[1];
-      const corner=Math.abs(2*t-1)**1.7*(.13*side.smile-.115*side.frown);
-      const arch=Math.sin(Math.PI*t);
-      const lipY=y+corner+(upper?1:-1)*height*arch+(upper?.024*side.upper*arch:0);
-      const z=faceSurface(x,-.379)+.033+.025*funnel-.015*jaw;
-      return [x,lipY,z];
-    };
-    this.updateCurve(this.upperLip,t=>lipPoint(t,true));this.updateCurve(this.lowerLip,t=>lipPoint(t,false));
-    const opening=this.mouthInterior.geometry.attributes.position;
-    for(let i=0;i<=32;i++)for(let side=0;side<2;side++) {
-      const point=lipPoint(i/32,side===0);point[2]-=.006;
-      opening.setXYZ(i*2+side,...point);
-    }
-    opening.needsUpdate=true;this.mouthInterior.geometry.computeVertexNormals();
-    this.stage.dataset.jawOpen=expression.jaw.toFixed(3);
+    material.customProgramCacheKey=()=> 'sculpted-portrait-collage-v3';
+    return material;
   }
 
   bindControls() {
+    $('portrait-retry-model').addEventListener('click',()=>this.loadModel());
     $('portrait-reset-view').addEventListener('click',()=>this.resetView());
     $('portrait-rotate').addEventListener('click',()=>{
       this.autoRotate=!this.autoRotate;
@@ -260,12 +154,19 @@ class GroupPortrait {
   resize() {
     const {width,height}=this.stage.getBoundingClientRect();
     if(width<1||height<1) return;
-    this.camera.aspect=width/height;this.camera.updateProjectionMatrix();
+    this.camera.aspect=width/height;
+    const fit=Math.max(5.45,4.25/this.camera.aspect);
+    if(fit!==(this.fitDistance||5.45)) {
+      const offset=this.camera.position.clone().sub(this.controls.target).multiplyScalar(fit/(this.fitDistance||5.45));
+      this.camera.position.copy(this.controls.target).add(offset);
+    }
+    this.fitDistance=fit;
+    this.camera.updateProjectionMatrix();
     this.renderer.setSize(width,height,false);
   }
 
   resetView() {
-    this.camera.position.set(.12,.24,6.1);this.controls.target.set(0,.12,-.05);this.controls.update();
+    this.controls.target.set(0,-.04,0);this.camera.position.set(.40,.09,this.fitDistance||5.45);this.controls.update();
   }
 
   setState(state,connected) {
@@ -289,6 +190,12 @@ class GroupPortrait {
     if(signature===this.emotionSignature)return;
     this.emotionSignature=signature;
     this.targetMorphs=morphWeights(scores);
+    // Relax the source mask's downturned rest face. Let expressive poses take
+    // over rather than adding a permanent smile to sadness or anger.
+    const repose=Object.keys(scores).length?(scores.neutral||0):1;
+    this.targetMorphs.browInnerUp=(this.targetMorphs.browInnerUp||0)+repose*.12;
+    this.targetMorphs.mouthSmile_L=(this.targetMorphs.mouthSmile_L||0)+repose*.16;
+    this.targetMorphs.mouthSmile_R=(this.targetMorphs.mouthSmile_R||0)+repose*.16;
     const rows=$('portrait-emotions');rows.replaceChildren();
     $('portrait-emotions-title').textContent=this.preview==='group'?'群体表情':'预览表情';
     if(!Object.keys(scores).length) {
@@ -326,6 +233,7 @@ class GroupPortrait {
   }
 
   async loadPhotos(records) {
+    if(!this.ready){this.loadingPhotos=records.length>0;return;}
     const generation=++this.generation;
     clearTimeout(this.photoRetryTimer);
     this.abort?.abort();this.abort=new AbortController();
@@ -346,18 +254,10 @@ class GroupPortrait {
     clearTimeout(timeout);
     const images=results.map(result=>result.status==='fulfilled'?result.value:null);
     if(this.disposed||generation!==this.generation){images.forEach(image=>image?.close());return;}
-    const aligned=images.map((image,i)=>image?alignedPhoto(image,records[i].photo_anchors):null);
+    const aligned=images.map((image,i)=>image?createAlignedPhoto(image,records[i].photo_anchors,{size:SIZE,...this.projection,baseColor:BASE_COLOR}):null);
     this.loadedCount=images.filter(Boolean).length;
-    const cells=voronoiCells();
-    const ctx=this.atlasContext;
-    cells.forEach((cell,index)=>{
-      const points=cell.map(([x,y])=>[x*SIZE,y*SIZE]);
-      ctx.save();path(ctx,points);ctx.clip();
-      const photo=aligned[index%records.length];
-      if(photo)ctx.drawImage(photo,0,0);
-      ctx.restore();
-      if(records.length>1){path(ctx,points);ctx.strokeStyle='rgba(229,236,231,.80)';ctx.lineWidth=2.6;ctx.stroke();}
-    });
+    paintCollage(this.atlasContext,aligned,SIZE,BASE_COLOR);
+    aligned.forEach(photo=>{if(photo)photo.width=photo.height=1;});
     images.forEach(image=>image?.close());
     this.texture.needsUpdate=true;this.loadingPhotos=false;this.updateStatus();
     if(this.loadedCount<records.length && (this.photoRetries||0)<2) {
@@ -373,18 +273,20 @@ class GroupPortrait {
     this.frameId=requestAnimationFrame(now=>this.animate(now));
     const delta=Math.min(.1,(time-this.lastFrame)/1000);this.lastFrame=time;
     if(document.hidden||this.stage.getBoundingClientRect().width<1)return;
-    const alpha=1-Math.exp(-delta/0.48);
-    let moving=false;
+    const alpha=1-Math.exp(-delta/(this.reducedMotion.matches?.45:1.8));
     for(const mesh of this.morphMeshes)for(const [name,index] of Object.entries(mesh.morphTargetDictionary)) {
       const step=((this.targetMorphs[name]||0)-mesh.morphTargetInfluences[index])*alpha;
-      mesh.morphTargetInfluences[index]+=step;moving=moving||Math.abs(step)>.00001;
+      mesh.morphTargetInfluences[index]+=step;
     }
-    if(this.ready&&moving)this.updateDetails();
+    if(this.head) this.stage.dataset.jawOpen=(this.head.morphTargetInfluences[this.head.morphTargetDictionary.jawOpen]||0).toFixed(3);
     this.photoUniform.value+=((this.loadedCount?1:0)-this.photoUniform.value)*alpha;
-    // The sculpture supplies features while empty. Once photos arrive their
-    // own eyes and lips remain visible instead of painted-on artificial eyes.
-    for(const material of this.facialMaterials||[])material.opacity=Math.max(0,1-this.photoUniform.value*1.05);
-    this.controls.autoRotate=this.autoRotate;this.controls.update(delta);
+    // A gentle oscillation keeps the open sculptural mask facing the viewer.
+    this.controls.autoRotate=false;
+    if(this.model) {
+      const target=this.autoRotate&&!this.reducedMotion.matches?Math.sin(time*.00016)*.20:0;
+      this.model.rotation.y+=(target-this.model.rotation.y)*(1-Math.exp(-delta/1.4));
+    }
+    this.controls.update(delta);
     this.renderer.render(this.scene,this.camera);
     if(time-this.lastStats>500) {
       this.lastStats=time;

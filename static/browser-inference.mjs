@@ -32,7 +32,19 @@ export function scoresFromLogits(logits) {
 export function alignmentAnchors(landmarks) {
   const average = (a, b) => [(landmarks[a].x + landmarks[b].x) / 2, (landmarks[a].y + landmarks[b].y) / 2];
   const eyes = [average(33, 133), average(263, 362)].sort((a, b) => a[0] - b[0]);
-  return {left_eye: eyes[0], right_eye: eyes[1], nose: [landmarks[1].x, landmarks[1].y], mouth: average(13, 14)};
+  const point = index => [landmarks[index].x, landmarks[index].y];
+  const corners = [point(61), point(291)].sort((a, b) => a[0] - b[0]);
+  // Preserve the original four anchors exactly. Separate lip and opening
+  // anchors let the portrait compress photographed teeth into its mouth gap
+  // instead of projecting a broad open smile across the physical lips.
+  return {
+    left_eye: eyes[0], right_eye: eyes[1], nose: point(1), mouth: average(13, 14),
+    mouth_left: corners[0], mouth_right: corners[1],
+    mouth_upper_outer: point(0), mouth_upper_inner: point(13),
+    mouth_lower_inner: point(14), mouth_lower_outer: point(17),
+    mouth_upper_contour: [78,191,80,81,82,13,312,311,310,415,308].map(point).sort((a,b)=>a[0]-b[0]),
+    mouth_lower_contour: [78,95,88,178,87,14,317,402,318,324,308].map(point).sort((a,b)=>a[0]-b[0]),
+  };
 }
 
 export function sharpnessVariance(rgba, width, height) {
@@ -218,7 +230,7 @@ export class BrowserEmotionAnalyzer {
         this._core ||= new BrowserInferenceCore();
         await this._core.init(onProgress);
       } else {
-        this._worker = new Worker(local('./inference-worker.js'));
+        this._worker = new Worker(local('./inference-worker.js?v=20261027-sculpture'));
         this._worker.onmessage = ({data}) => {
           const request = this._pending.get(data.id);
           if (!request) return;

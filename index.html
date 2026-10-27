@@ -10,11 +10,13 @@
   <title>群体肖像 · 机器如何理解人类的情绪</title>
   <link rel="stylesheet" href="./static/style.css?v=20261027-emotions">
   <link rel="stylesheet" href="./static/gallery-theme.css?v=20261027-arrival">
+  <link rel="stylesheet" href="./static/scent-instrument.css?v=20261027-atelier">
+  <link rel="stylesheet" href="./static/scent-atelier.css?v=20261027-atelier">
   <script type="importmap">{"imports":{"three":"./static/vendor/three/three.module.js","three/addons/":"./static/vendor/three/addons/"}}</script>
   <script type="module" src="./static/app.js?v=20261027-arrival"></script>
   <script type="module" src="./static/portrait.js?v=20261027-arrival"></script>
   <script type="module" src="./static/music.js?v=20261027-breath"></script>
-  <script type="module" src="./static/scent.js"></script>
+  <script type="module" src="./static/scent.js?v=20261027-atelier"></script>
 </head>
 <body>
   <svg class="svg-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -226,51 +228,75 @@
     </details>
     </section>
 
-    <section id="scent-panel" class="scent-panel" role="tabpanel" aria-labelledby="nav-scent" data-phase="idle" hidden>
+    <section id="scent-panel" class="scent-panel scent-atelier" role="tabpanel" aria-labelledby="nav-scent" data-phase="stopped" hidden>
       <header class="scent-header">
         <div class="scent-identity">
-          <div class="scent-heading"><h2 id="scent-title">群体气味</h2><span class="scent-simulation-badge">模拟输出 · 未连接气味设备</span></div>
+          <p class="scent-eyebrow">03 / THE OLFACTORY INSTRUMENT</p>
+          <div class="scent-heading"><h2 id="scent-title">情绪调香仪</h2><span class="scent-simulation-badge">气味模拟 · 未连接实物</span></div>
+          <p class="scent-introduction">把群体的表情，调成一份气味。</p>
           <p id="scent-source" class="scent-source">等待观众</p>
         </div>
         <div class="scent-controls">
-          <button id="scent-toggle" class="button primary scent-toggle" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#icon-play"></use></svg><span id="scent-toggle-label">开启模拟</span></button>
+          <button id="scent-toggle" class="button primary scent-toggle" type="button"><svg class="icon" aria-hidden="true"><use href="#icon-play"></use></svg><span id="scent-toggle-label">开启模拟</span></button>
           <button id="scent-stop" class="button subtle scent-stop" type="button" disabled><svg class="icon" aria-hidden="true"><use href="#icon-stop"></use></svg><span>立即停止</span></button>
         </div>
       </header>
 
-      <div class="scent-layout">
-        <section class="scent-recipe" aria-labelledby="scent-recipe-heading">
-          <div class="scent-section-heading"><h3 id="scent-recipe-heading">气味配方</h3><span id="scent-recipe-code" class="scent-recipe-code">—</span></div>
-          <p id="scent-recipe-name" class="scent-recipe-name">暂无配方</p>
-          <div class="scent-channels" aria-label="四种基础气味的虚拟通道配比">
-            <div class="scent-channel" data-scent-channel="citrus"><div class="scent-channel-label"><span class="scent-channel-dot" aria-hidden="true"></span><span>柑橘</span></div><div class="scent-channel-track"><span id="scent-citrus-fill" class="scent-channel-fill"></span></div><span id="scent-citrus-ratio" class="scent-channel-ratio">0%</span><span id="scent-citrus-output" class="scent-channel-output">关闭</span></div>
-            <div class="scent-channel" data-scent-channel="floral"><div class="scent-channel-label"><span class="scent-channel-dot" aria-hidden="true"></span><span>花香</span></div><div class="scent-channel-track"><span id="scent-floral-fill" class="scent-channel-fill"></span></div><span id="scent-floral-ratio" class="scent-channel-ratio">0%</span><span id="scent-floral-output" class="scent-channel-output">关闭</span></div>
-            <div class="scent-channel" data-scent-channel="wood"><div class="scent-channel-label"><span class="scent-channel-dot" aria-hidden="true"></span><span>木质</span></div><div class="scent-channel-track"><span id="scent-wood-fill" class="scent-channel-fill"></span></div><span id="scent-wood-ratio" class="scent-channel-ratio">0%</span><span id="scent-wood-output" class="scent-channel-output">关闭</span></div>
-            <div class="scent-channel" data-scent-channel="herbal"><div class="scent-channel-label"><span class="scent-channel-dot" aria-hidden="true"></span><span>草本</span></div><div class="scent-channel-track"><span id="scent-herbal-fill" class="scent-channel-fill"></span></div><span id="scent-herbal-ratio" class="scent-channel-ratio">0%</span><span id="scent-herbal-output" class="scent-channel-output">关闭</span></div>
-          </div>
-          <p class="scent-recipe-note">比例为虚拟通道配比，不代表实际浓度。</p>
-          <p id="scent-pending" class="scent-pending" role="status" hidden></p>
-        </section>
-
-        <section class="scent-process" aria-labelledby="scent-process-title">
-          <div class="scent-section-heading"><h3 id="scent-process-title">释放过程</h3><span id="scent-status" class="scent-status" role="status">尚未开启</span></div>
-          <ol class="scent-phase-track" aria-label="模拟释放的四个阶段">
-            <li data-scent-phase="mixing"><span class="scent-phase-number" aria-hidden="true">01</span><span>调配</span></li>
-            <li data-scent-phase="releasing"><span class="scent-phase-number" aria-hidden="true">02</span><span>释放</span></li>
-            <li data-scent-phase="purging"><span class="scent-phase-number" aria-hidden="true">03</span><span>清味</span></li>
-            <li data-scent-phase="waiting"><span class="scent-phase-number" aria-hidden="true">04</span><span>等待</span></li>
-          </ol>
-          <div class="scent-progress-heading"><span>当前阶段</span><span id="scent-countdown" class="scent-countdown">—</span></div>
-          <div id="scent-progress" class="scent-progress" role="progressbar" aria-label="当前气味模拟阶段进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="scent-progress-fill"></span></div>
-          <p id="scent-detail" class="scent-detail">开启模拟后，查看气味配方如何随群体表情变化。</p>
-          <p class="scent-cycle-note">演示周期：调配 3 秒 · 释放 6 秒 · 清味 8 秒 · 等待 5 秒<br><span>仅用于展示流程，实际设备需另行标定。</span></p>
-        </section>
+      <div class="scent-preview-strip" role="group" aria-label="气味情绪联动预览">
+        <span class="scent-preview-label">以一种情绪开始</span>
+        <button type="button" data-scent-preview="happiness" aria-pressed="false">快乐</button>
+        <button type="button" data-scent-preview="sadness" aria-pressed="false">悲伤</button>
+        <button type="button" data-scent-preview="anger" aria-pressed="false">愤怒</button>
+        <button type="button" data-scent-preview="fear" aria-pressed="false">恐惧</button>
+        <button type="button" data-scent-preview="group" aria-pressed="true">跟随群体</button>
       </div>
 
-      <details class="scent-history">
-        <summary><span>最近过程</span><svg class="icon" aria-hidden="true"><use href="#icon-chevron"></use></svg></summary>
-        <ol id="scent-log" class="scent-log" aria-label="最近的气味模拟过程" hidden></ol>
-      </details>
+      <div class="scent-workbench">
+        <div class="scent-machine-column">
+          <figure class="scent-machine-figure">
+            <div class="scent-machine-heading"><span>八支原料 · 一个共同的气味</span><span id="scent-status" class="scent-status" role="status">尚未开启</span></div>
+            <div id="scent-instrument" class="scent-instrument-mount" aria-label="八种香气原料经计量阀汇入混合舱的互动仪器"></div>
+            <figcaption class="scent-machine-caption"><span>点击原料仓，追溯它的情绪来源</span><span>液柱与阀位表示模拟配比</span></figcaption>
+          </figure>
+          <section class="scent-cycle" aria-label="调配与释放过程">
+            <ol class="scent-cycle-steps">
+              <li data-scent-phase="mixing"><span>01</span>调配</li>
+              <li data-scent-phase="releasing"><span>02</span>释放</li>
+              <li data-scent-phase="purging"><span>03</span>清味</li>
+              <li data-scent-phase="waiting"><span>04</span>等待</li>
+            </ol>
+            <div class="scent-progress-heading"><span id="scent-detail">选择情绪或加入观众，再开启模拟。</span><span id="scent-countdown" class="scent-countdown">—</span></div>
+            <div id="scent-progress" class="scent-progress" role="progressbar" aria-label="当前模拟阶段进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="scent-progress-fill"></span></div>
+          </section>
+        </div>
+
+        <aside id="scent-inspector" class="scent-inspector" aria-labelledby="scent-ingredient-name">
+          <p class="scent-eyebrow" id="scent-ingredient-number">INGREDIENT / 01</p>
+          <div class="scent-ingredient-heading"><span id="scent-ingredient-swatch" class="scent-ingredient-swatch" aria-hidden="true"></span><h3 id="scent-ingredient-name">佛手柑</h3></div>
+          <p id="scent-ingredient-character" class="scent-ingredient-character"></p>
+          <div class="scent-explain-tabs" role="tablist" aria-label="选择要解释的配方">
+            <button id="scent-explain-current" type="button" role="tab" aria-selected="true" aria-controls="scent-explanation">准备配方</button>
+            <button id="scent-explain-target" type="button" role="tab" aria-selected="false" aria-controls="scent-explanation" tabindex="-1">下一轮目标</button>
+          </div>
+          <div id="scent-explanation" role="tabpanel" aria-labelledby="scent-explain-current">
+            <div class="scent-ingredient-share"><strong id="scent-selected-ratio">—</strong><span>配方占比</span></div>
+            <p id="scent-selected-delta" class="scent-selected-delta" hidden></p>
+            <h4>为什么会有它</h4>
+            <p id="scent-rationale" class="scent-rationale">选择情绪后，这里会显示原料与情绪之间的联系。</p>
+            <div class="scent-contribution-heading"><span>情绪来源</span><span>配方贡献</span></div>
+            <div id="scent-contributions" class="scent-contributions"></div>
+            <p id="scent-origin-note" class="scent-origin-note"></p>
+          </div>
+          <p class="scent-art-note">这些联系是作品的创作规则。配比表示虚拟通道的构成，不代表实际浓度。</p>
+        </aside>
+      </div>
+
+      <section class="scent-composition" aria-labelledby="scent-recipe-heading">
+        <div class="scent-composition-heading"><div><p class="scent-eyebrow" id="scent-recipe-heading">准备配方</p><h3 id="scent-recipe-name">等待一份情绪</h3></div><p id="scent-recipe-code" class="scent-recipe-code">—</p></div>
+        <div id="scent-ingredients" class="scent-ingredients" role="group" aria-label="八种原料的配方占比与选择"></div>
+        <p id="scent-pending" class="scent-next-note" role="status" hidden></p>
+      </section>
+      <details class="scent-history"><summary><span>最近调配过程</span><svg class="icon" aria-hidden="true"><use href="#icon-chevron"></use></svg></summary><ol id="scent-log" class="scent-log" aria-label="最近的气味模拟过程" hidden></ol></details>
     </section>
 
     <footer class="page-footer">

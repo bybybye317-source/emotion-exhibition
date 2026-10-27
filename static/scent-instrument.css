@@ -1,0 +1,64 @@
+/* Precision perfumery. All selectors stay inside this component. */
+.scent-instrument-mount {
+  --anatomy-paper:#16191b; --anatomy-face:#25292a; --anatomy-top:#323536;
+  --anatomy-shade-0:#101315; --anatomy-shade-1:#191d20;
+  --anatomy-shade-2:#22272a; --anatomy-shade-3:#2b3032;
+  --anatomy-lit-top:#353735; --anatomy-lit-shade:#292d2b;
+  --anatomy-hi:#9d9e93; --anatomy-mid:#636b6b; --anatomy-lo:#3a4547;
+  --anatomy-faint:#293234; --anatomy-lit:#d8c7a3; --anatomy-dot:#d9d7c8;
+  --anatomy-weight:.55px; --anatomy-mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  position:relative; min-width:0; width:100%; isolation:isolate;
+}
+.scent-instrument-mount .si-svg { display:block; width:100%; height:auto; overflow:visible; }
+.scent-instrument-mount .si-svg path,
+.scent-instrument-mount .si-svg circle { vector-effect:non-scaling-stroke; }
+.scent-instrument-mount .iso-fill {fill:var(--anatomy-paper);stroke:none}
+.scent-instrument-mount .iso-shade,.scent-instrument-mount .iso-top {stroke:none}
+.scent-instrument-mount .iso-shade[data-shade="0"]{fill:var(--anatomy-shade-0)}
+.scent-instrument-mount .iso-shade[data-shade="1"]{fill:var(--anatomy-shade-1)}
+.scent-instrument-mount .iso-shade[data-shade="2"]{fill:var(--anatomy-shade-2)}
+.scent-instrument-mount .iso-shade[data-shade="3"]{fill:var(--anatomy-shade-3)}
+.scent-instrument-mount .iso-top{fill:var(--anatomy-top)}
+.scent-instrument-mount .iso-line {fill:none;stroke:var(--anatomy-lo);stroke-width:var(--anatomy-weight);stroke-linecap:round;stroke-linejoin:round}
+.scent-instrument-mount .iso-line[data-tone="hi"]{stroke:var(--anatomy-hi)}
+.scent-instrument-mount .iso-line[data-tone="mid"]{stroke:var(--anatomy-mid)}
+.scent-instrument-mount .iso-line[data-tone="lo"]{stroke:var(--anatomy-lo)}
+.scent-instrument-mount .iso-line[data-tone="faint"]{stroke:var(--anatomy-faint)}
+.scent-instrument-mount .iso-dots circle{fill:var(--anatomy-dot);stroke:none;opacity:.45}
+.scent-instrument-mount .iso-dots[data-tone="hi"] circle{opacity:.72}
+.scent-instrument-mount .iso-face-text{fill:var(--anatomy-hi);font-family:var(--anatomy-mono);letter-spacing:.04em}
+.scent-instrument-mount .tb-body{fill:#525b5a;stroke:none}
+.scent-instrument-mount .tb-shine{fill:#89928a;stroke:none;opacity:.6}
+.scent-instrument-mount .tb-shade{fill:#222a2b;stroke:none}
+.scent-instrument-mount .tb-ring{fill:none;stroke:var(--anatomy-lo);stroke-width:.45;stroke-linecap:butt}
+.scent-instrument-mount .si-shadow{fill:#000;opacity:.65;filter:blur(15px)}
+.scent-instrument-mount .si-glass-back{fill:#0c1214;fill-opacity:.63;stroke:none}
+.scent-instrument-mount .si-glass-surface{fill:var(--si-glass-url);stroke:none}
+.scent-instrument-mount .si-glass-edge{fill:none;stroke:#8b9b97;stroke-opacity:.45;stroke-width:.7}
+.scent-instrument-mount .si-glass-rim{fill:none;stroke:#bdc4b5;stroke-opacity:.34;stroke-width:.7}
+.scent-instrument-mount .si-glass-reflection{fill:none;stroke:#dbe8e4;stroke-opacity:.18;stroke-width:2.1;stroke-linecap:round}
+.scent-instrument-mount .si-scale{fill:none;stroke:#a9b3a9;stroke-width:.55;stroke-opacity:.36}
+.scent-instrument-mount .si-liquid{opacity:.32}
+.scent-instrument-mount .si-meniscus{opacity:.45}
+.scent-instrument-mount .si-flow{fill:none;stroke:#d5c6a6;stroke-width:1.3;stroke-linecap:round;stroke-dasharray:10 90;opacity:0}
+.scent-instrument-mount .si-pipe[data-selected="true"] .tb-shine{fill:#cfb98e;opacity:.95}
+.scent-instrument-mount .si-pipe[data-selected="true"] .tb-body{fill:#7b7463}
+.scent-instrument-mount .si-purge .si-flow{stroke:#aec6c9}
+.scent-instrument-mount .si-valve-pointer{fill:none;stroke:#d1c6af;stroke-width:1.1;stroke-linecap:round}
+.scent-instrument-mount .si-vortex{fill:none;stroke:#cbbb9a;stroke-width:.8;stroke-opacity:0;stroke-dasharray:25 75;stroke-linecap:round}
+.scent-instrument-mount .si-chamber-light{fill:var(--si-chamber-url);opacity:0}
+.scent-instrument-mount .si-aperture{fill:#070d0f;stroke:#867d6c;stroke-width:.6}
+.scent-instrument-mount .si-outlet-ring{fill:none;stroke:#d3c5a5;stroke-width:1;opacity:0}
+.scent-instrument-mount .si-mist{fill:#cfcbbd;filter:var(--si-soft-url);opacity:0;pointer-events:none}
+.scent-instrument-mount .si-label {font-family:inherit;font-size:12px;font-weight:400;fill:#bcbeb7;letter-spacing:.03em}
+.scent-instrument-mount .si-percent {font-family:var(--anatomy-mono);font-size:12px;fill:#e1d4b9;letter-spacing:.03em;font-variant-numeric:tabular-nums}
+.scent-instrument-mount .si-label-bg {fill:#101415;fill-opacity:.9;stroke:#46504c;stroke-opacity:.35;stroke-width:.5}
+.scent-instrument-mount .si-hit {fill:transparent;stroke:transparent;stroke-width:.8;pointer-events:all}
+.scent-instrument-mount .si-reservoir-button {cursor:pointer;outline:none}
+.scent-instrument-mount .si-reservoir-button:hover .si-label-bg,
+.scent-instrument-mount .si-reservoir-button[aria-pressed="true"] .si-label-bg {stroke:#c8b693;stroke-opacity:.9;fill:#242722}
+.scent-instrument-mount .si-reservoir-button:focus-visible .si-hit {stroke:#d7c49f;stroke-dasharray:3 3}
+.scent-instrument-mount .si-pending-mark {fill:none;stroke:#d0c2a2;stroke-width:1.3;stroke-linecap:round;opacity:0}
+@media (prefers-reduced-motion:reduce) {
+ .scent-instrument-mount *, .scent-instrument-mount *::before, .scent-instrument-mount *::after {animation:none!important;transition:none!important}
+}

@@ -1,0 +1,122 @@
+/* The instrument shares the site's black gallery, with readable material records. */
+.scent-atelier { padding: 6px 0 0; --scent-accent: #c8b693; }
+.scent-atelier .scent-header { align-items: center; margin-bottom: 24px; }
+.scent-eyebrow { margin: 0 0 10px; font-size: 10px; font-weight: 400; line-height: 1.5; letter-spacing: .14em; color: #8b8d94; }
+.scent-atelier .scent-heading h2 { font-family: "Songti SC", "Noto Serif CJK SC", serif; font-size: 34px; font-weight: 400; letter-spacing: .08em; }
+.scent-introduction { margin: 12px 0 7px; font-size: 14px; color: #c4c1ba; line-height: 1.8; }
+.scent-atelier .scent-source { margin-top: 3px; font-size: 11px; color: #90939a; }
+.scent-atelier .scent-simulation-badge { color: #9c9b98; background: transparent; border-color: #33363b; font-size: 10px; border-radius: 3px; }
+.scent-atelier .scent-toggle.button { background: #c8b693; border-color: #c8b693; color: #111317; }
+.scent-atelier .scent-toggle.button:hover:not(:disabled) { background: #e0ceb0; border-color: #e0ceb0; }
+.scent-atelier .scent-toggle[aria-pressed=true] { background: #302c24!important; border-color: #5e5442!important; color: #c8b693; }
+.scent-atelier .scent-stop.button { background: transparent; border-color: #36383e; color: #bbb9b3; }
+.scent-preview-strip { display: flex; align-items: center; gap: 8px; border-block: 1px solid #26282d; padding: 12px 0; margin-bottom: 26px; }
+.scent-preview-label { color: #92959b; font-size: 11px; margin-right: auto; }
+.scent-preview-strip button { min-height: 34px; border: 1px solid transparent; border-radius: 3px; background: transparent; padding: 7px 14px; color: #b0b1b6; font-size: 12px; }
+.scent-preview-strip button[aria-pressed=true] { border-color: #5f5543; background: #242119; color: #e0cfad; }
+.scent-preview-strip button:hover { color: #e5d7bb; }
+.scent-workbench { display: grid; grid-template-columns: minmax(0,1fr) 306px; gap: 30px; align-items: start; }
+.scent-machine-column { min-width: 0; }
+.scent-machine-figure { margin: 0; overflow: hidden; border: 1px solid #292c32; border-radius: 5px; background: radial-gradient(ellipse at 48% 46%, #171b21, #0a0c0f 70%); }
+.scent-machine-heading, .scent-machine-caption { padding: 17px 20px; display: flex; align-items: center; justify-content: space-between; gap: 14px; font-size: 11px; line-height: 1.6; color: #9a9da6; }
+.scent-machine-heading { border-bottom: 1px solid #22262d; }
+.scent-machine-heading>span:first-child { color: #c0bdb6; letter-spacing: .04em; }
+.scent-machine-caption { border-top: 1px solid #22262d; font-size: 10px; }
+.scent-machine-caption span:last-child { color: #747a84; }
+.scent-instrument-mount { width: 100%; min-height: 450px; display: grid; align-items: center; overflow: hidden; }
+.scent-instrument-mount>svg { display: block; width: 100%; height: auto; }
+.scent-atelier .scent-status { font-size: 10px; border: 1px solid #3a3e44; background: transparent; color: #c7bcaa; white-space: nowrap; padding: 4px 8px; border-radius: 3px; }
+.scent-cycle { margin-top: 20px; }
+.scent-cycle-steps { list-style: none; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; margin: 0 0 16px; padding: 0; }
+.scent-cycle-steps li { border-top: 1px solid #363940; padding-top: 11px; color: #90959e; display: flex; gap: 10px; font-size: 12px; }
+.scent-cycle-steps li>span { font-size: 10px; color: #777e88; font-variant-numeric: tabular-nums; padding-top: 1px; }
+.scent-cycle-steps li.is-active { border-color: #c8b693; color: #e0d1b7; }
+.scent-cycle-steps li.is-active>span { color: #c8b693; }
+.scent-atelier .scent-progress-heading { margin-bottom: 8px; gap: 18px; align-items: center; }
+.scent-atelier #scent-detail { font-size: 11px; line-height: 1.8; min-height: 20px; margin: 0; color: #9da1a9; }
+.scent-atelier .scent-countdown { font-size: 16px; font-weight: 400; white-space: nowrap; }
+.scent-atelier .scent-progress { height: 2px; background: #262a31; }
+.scent-inspector { min-width: 0; border-left: 1px solid #2a2d33; padding: 12px 0 0 26px; }
+.scent-ingredient-heading { display: flex; align-items: center; gap: 12px; }
+.scent-ingredient-heading h3 { margin: 0; font-family: "Songti SC", "Noto Serif CJK SC", serif; font-weight: 400; font-size: 29px; letter-spacing: .05em; }
+.scent-ingredient-swatch { width: 7px; height: 28px; border-radius: 4px; background: var(--ingredient-color, #c8b693); box-shadow: 0 0 16px color-mix(in srgb,var(--ingredient-color, #c8b693) 18%,transparent); }
+.scent-ingredient-character { min-height: 20px; margin: 12px 0 24px; color: #a7a6a4; font-size: 12px; line-height: 1.8; }
+.scent-explain-tabs { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid #33353c; gap: 14px; }
+.scent-explain-tabs button { background: transparent; border: 0; border-radius: 0; padding: 9px 0; margin-bottom: -1px; border-bottom: 1px solid transparent; font-size: 11px; color: #8c9099; }
+.scent-explain-tabs button[aria-selected=true] { color: #d4c29f; border-bottom-color: #c8b693; }
+.scent-ingredient-share { display: flex; align-items: baseline; gap: 14px; margin: 20px 0 4px; }
+.scent-ingredient-share strong { font-size: 45px; line-height: 1.25; font-weight: 300; letter-spacing: -.04em; color: #e0d6c2; font-variant-numeric: tabular-nums; }
+.scent-ingredient-share>span { font-size: 10px; color: #898e96; }
+.scent-selected-delta { margin: 7px 0 14px; font-size: 11px; color: #b7b19f; line-height: 1.8; }
+.scent-inspector h4 { margin: 22px 0 8px; font-weight: 400; font-size: 12px; color: #c6c3bc; }
+.scent-rationale { min-height: 66px; font-size: 12px; color: #b0b0b1; line-height: 1.9; margin: 0 0 20px; }
+.scent-contribution-heading { display: flex; justify-content: space-between; gap: 10px; font-size: 10px; color: #777e88; padding-bottom: 9px; border-bottom: 1px solid #292d33; }
+.scent-contributions { margin-top: 9px; max-height: 216px; overflow: auto; scrollbar-width: thin; }
+.scent-contribution { margin: 0 0 11px; }
+.scent-contribution-text { display: flex; justify-content: space-between; gap: 14px; font-size: 11px; color: #a5abb3; line-height: 1.8; }
+.scent-contribution-text strong { font-weight: 400; color: #c5c0b4; font-variant-numeric: tabular-nums; }
+.scent-contribution-track { height: 2px; background: #23272e; margin-top: 4px; }
+.scent-contribution-track>span { display: block; height: 100%; background: var(--ingredient-color,#c8b693); opacity: .75; }
+.scent-contributions .scent-empty { color: #838a94; font-size: 11px; line-height: 1.8; }
+.scent-origin-note, .scent-art-note { font-size: 10px; line-height: 1.8; color: #80858e; margin: 12px 0 0; }
+.scent-art-note { margin-top: 20px; padding-top: 14px; border-top: 1px solid #292d33; }
+.scent-composition { margin-top: 32px; padding-top: 24px; border-top: 1px solid #2a2d33; }
+.scent-composition-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 20px; }
+.scent-composition-heading h3 { font-family: "Songti SC", "Noto Serif CJK SC", serif; margin: 0; font-size: 25px; line-height: 1.6; font-weight: 400; letter-spacing: .06em; }
+.scent-atelier .scent-recipe-code { font-size: 9px; color: #767d88; max-width: 45%; margin: 0 0 3px; }
+.scent-ingredients { display: grid; grid-template-columns: repeat(8,minmax(0,1fr)); gap: 8px; }
+.scent-ingredient-button { --ingredient-color:#c8b693; position: relative; min-width: 0; text-align: left; padding: 13px 12px 12px; background: #111419; border: 1px solid #2d3138; border-radius: 4px; color: #bfc0c2; }
+.scent-ingredient-button::before { content:''; display: block; width: 18px; height: 2px; background: var(--ingredient-color); margin-bottom: 12px; opacity: .6; }
+.scent-ingredient-button[aria-pressed=true] { border-color: var(--ingredient-color); background: #1b1e23; }
+.scent-ingredient-button:hover { border-color: #8c826d; }
+.scent-ingredient-button .scent-material-name { display: block; font-size: 12px; white-space: nowrap; }
+.scent-material-ratio { display: block; font-size: 24px; font-weight: 300; color: #d3c9b6; line-height: 1.6; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.scent-material-delta { display: block; font-size: 9px; line-height: 1.8; color: #919ba5; min-height: 16px; }
+.scent-next-note { border-left: 1px solid #9e8c67; padding: 6px 0 6px 14px; font-size: 11px; color: #b1aa98; line-height: 1.9; margin: 18px 0 0; }
+.scent-atelier button:focus-visible { outline: 2px solid #d0be9e; outline-offset: 4px; }
+@media(max-width:1100px) {
+  .scent-workbench { grid-template-columns: minmax(0,1fr) 270px; gap: 22px; }
+  .scent-inspector { padding-left: 20px; }
+  .scent-instrument-mount { min-height: 410px; }
+  .scent-ingredients { grid-template-columns: repeat(4,minmax(0,1fr)); }
+}
+@media(max-width:800px) {
+  .scent-workbench { grid-template-columns: minmax(0,1fr); gap: 28px; }
+  .scent-instrument-mount { min-height: 390px; }
+  .scent-inspector { border-left: 0; border-top: 1px solid #2a2d33; padding: 24px 0 0; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.2fr); column-gap: 26px; align-items: start; }
+  .scent-inspector>.scent-eyebrow,.scent-ingredient-heading,.scent-ingredient-character,.scent-art-note { grid-column: 1; }
+  .scent-explain-tabs { grid-column: 2; grid-row: 1; }
+  #scent-explanation { grid-column: 2; grid-row: 2 / 6; }
+  .scent-inspector>.scent-eyebrow { margin-top: 8px; }
+  .scent-ingredient-character { margin-bottom: 0; }
+  .scent-art-note { margin-top: 8px; }
+}
+@media(max-width:560px) {
+  .scent-atelier .scent-header { align-items: flex-start; flex-direction: column; gap: 18px; margin-bottom: 20px; }
+  .scent-atelier .scent-heading h2 { font-size: 28px; }
+  .scent-atelier .scent-heading { gap: 10px; }
+  .scent-introduction { font-size: 12px; }
+  .scent-eyebrow { font-size: 9px; }
+  .scent-preview-strip { flex-wrap: wrap; gap: 5px; padding: 12px 0; margin-bottom: 18px; }
+  .scent-preview-label { flex: 1 0 100%; margin-bottom: 3px; font-size: 10px; }
+  .scent-preview-strip button { padding: 7px 10px; font-size: 11px; flex: 1; white-space: nowrap; }
+  .scent-machine-heading, .scent-machine-caption { padding: 12px; gap: 8px; font-size: 9px; }
+  .scent-machine-caption { flex-direction: column; align-items: flex-start; gap: 3px; }
+  .scent-instrument-mount { min-height: 330px; }
+  .scent-cycle-steps { gap: 8px; }
+  .scent-cycle-steps li { gap: 6px; font-size: 11px; }
+  .scent-inspector { display: block; }
+  .scent-ingredient-character { margin: 10px 0 18px; }
+  .scent-ingredient-share { margin-top: 17px; }
+  .scent-rationale { min-height: 0; }
+  .scent-contributions { max-height: none; }
+  .scent-composition-heading { align-items: start; }
+  .scent-composition-heading h3 { font-size: 22px; }
+  .scent-atelier .scent-recipe-code { font-size: 8px; max-width: 42%; }
+  .scent-ingredients { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 6px; }
+  .scent-ingredient-button { padding: 11px 8px 9px; }
+  .scent-ingredient-button .scent-material-name { font-size: 11px; }
+  .scent-material-ratio { font-size: 22px; }
+  .scent-material-delta { font-size: 8px; }
+  .scent-composition { margin-top: 26px; }
+}

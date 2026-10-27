@@ -1,8 +1,13 @@
-import {CHANNELS, PHASE_DURATIONS, normalizeRecipe} from './scent-math.mjs';
+import {CHANNELS, EMOTIONS, SCENT_PROFILES, PHASE_DURATIONS, normalizeRecipe, recipeForScores} from './scent-math.mjs?v=20261027-atelier';
 
 const zeroChannels = () => Object.fromEntries(CHANNELS.map(({key}) => [key, 0]));
 const copy = value => value == null ? null : JSON.parse(JSON.stringify(value));
 const clamp = value => Math.max(0, Math.min(1, value));
+const sameRecipe = (a, b) => a?.code === b?.code
+  && Boolean(a?.emotionWeights) === Boolean(b?.emotionWeights)
+  && EMOTIONS.every(key => a?.emotionWeights?.[key] === b?.emotionWeights?.[key]);
+const rawIngredients = distribution => Object.fromEntries(CHANNELS.map(({key}, index) => [key,
+  EMOTIONS.reduce((sum, emotion) => sum + distribution[emotion] * SCENT_PROFILES[emotion][index], 0)]));
 const PHASE_LABELS = {mixing: '配方准备', releasing: '模拟释放', purging: '清气模拟', waiting: '间隔等待'};
 const NEXT_PHASE = {mixing: 'releasing', releasing: 'purging', purging: 'waiting', waiting: 'mixing'};
 
@@ -30,6 +35,7 @@ export class ScentSimulator {
     this._target = null;
     this._active = null;
     this._smoothed = null;
+    this._smoothedWeights = null;
     this._smoothAt = null;
     this._phaseAt = null;
     this._lastTick = null;
@@ -53,14 +59,22 @@ export class ScentSimulator {
     if (!this._target || !this._smoothed) { this._smoothAt = at; return; }
     const delta = Math.max(0, at - (this._smoothAt ?? at));
     const amount = 1 - Math.exp(-delta / 6000);
-    for (const {key} of CHANNELS) {
-      this._smoothed[key] += amount * (this._target.percentages[key] - this._smoothed[key]);
+    if (this._smoothedWeights && this._target.emotionWeights) {
+      for (const emotion of EMOTIONS) {
+        this._smoothedWeights[emotion] += amount * (this._target.emotionWeights[emotion] - this._smoothedWeights[emotion]);
+      }
+      this._smoothed = rawIngredients(this._smoothedWeights);
+    } else {
+      for (const {key} of CHANNELS) {
+        this._smoothed[key] += amount * (this._target.percentages[key] - this._smoothed[key]);
+      }
     }
     this._smoothAt = Math.max(this._smoothAt ?? at, at);
   }
 
   _smoothedRecipe() {
-    return this._smoothed ? normalizeRecipe({percentages: this._smoothed, dominant: this._target?.dominant}) : null;
+    if (this._smoothedWeights) return recipeForScores(this._smoothedWeights);
+    return this._smoothed ? normalizeRecipe({percentages: this._smoothed}) : null;
   }
 
   _beginCycle(at) {
@@ -94,12 +108,13 @@ export class ScentSimulator {
     this._heartbeat(at);
     this._smooth(at);
     const next = normalizeRecipe(recipe);
-    const changed = next?.code !== this._target?.code;
+    const changed = !sameRecipe(next, this._target);
     this._target = next;
     if (!next) {
       const hadActive = this._active !== null;
       this._active = null;
       this._smoothed = null;
+      this._smoothedWeights = null;
       this._phaseAt = null;
       this._smoothAt = at;
       this.phase = this.enabled ? 'idle' : 'stopped';
@@ -107,7 +122,14 @@ export class ScentSimulator {
       this.driver.clear();
       if (hadActive) this._log('cleared', '群体数据已清空 · 模拟输出归零', at);
     } else {
-      if (!this._smoothed) this._smoothed = {...next.percentages};
+      if (!this._smoothed) {
+        this._smoothedWeights = copy(next.emotionWeights);
+        this._smoothed = this._smoothedWeights ? rawIngredients(this._smoothedWeights) : {...next.percentages};
+      } else if (!next.emotionWeights) {
+        // Once a manual component is blended in, its source cannot be invented.
+        // Keep percentage smoothing without attribution until the session is cleared.
+        this._smoothedWeights = null;
+      }
       this._smoothAt = at;
       if (changed && this._active) this._log('target', '新配方已接收 · 下一轮更新', at);
       if (this.enabled && this.phase === 'idle') {
@@ -146,6 +168,7 @@ export class ScentSimulator {
     if (reason === 'cleared') {
       this._target = null;
       this._smoothed = null;
+      this._smoothedWeights = null;
       this._smoothAt = at;
       this.cycles = 0;
       this._logs = [];
@@ -193,7 +216,7 @@ export class ScentSimulator {
       activeRecipe: copy(this._active),
       targetRecipe: copy(this._target),
       smoothedRecipe: this._smoothedRecipe(),
-      pending: Boolean(this._active && this._target && this._active.code !== this._target.code),
+      pending: Boolean(this._active && this._target && !sameRecipe(this._active, this._target)),
       outputs: this.enabled && this.phase === 'releasing' && this._active ? {...this._active.percentages} : zeroChannels(),
       purge: this.enabled && this.phase === 'purging' ? 1 : 0,
       cycles: this.cycles,

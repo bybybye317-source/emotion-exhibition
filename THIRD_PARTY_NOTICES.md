@@ -1,6 +1,6 @@
 # 素材与依赖说明
 
-核验日期：2026-10-27。下述许可证各自适用于对应的第三方文件，不将整站或模型权重一并重新授权。
+核验日期：2026-10-28。下述许可证各自适用于对应的第三方文件，不将整站或模型权重一并重新授权。
 
 | 组件 | 来源 / 固定版本 | 许可与记录 |
 |---|---|---|
@@ -11,6 +11,7 @@
 | ONNX Runtime Web | `onnxruntime-web@1.22.0`，WASM-only | MIT，Copyright Microsoft Corporation；[许可证](static/vendor/ort/LICENSE)、[第三方说明](static/vendor/ort/ThirdPartyNotices.txt) |
 | MediaPipe Tasks Vision | `@mediapipe/tasks-vision@0.10.21` | Apache-2.0；[许可证](static/vendor/mediapipe/LICENSE) |
 | Face Landmarker 模型 | Google `float16/1`，模型原样保留 | Apache-2.0；[来源、官方模型卡与许可](static/inference-models/SOURCES.md) |
+| Anatomy 几何工具 | 2026-10-28 从已安装 Anatomy 技能复制的构建工具（iso-kit、lathe、tube、audit） | MIT，Copyright (c) 2026 Ryan；[许可证](scripts/vendor/anatomy/LICENSE)。仅构建时使用，运行时加载本站生成的 SVG |
 | 表情分类 B0 | EmotiEffLib `enet_b0_8_best_afew`，固定作者提交，点击识别后从原始地址下载 | 本仓库不包含该 ONNX 权重、不重新授权权重；[来源、SHA-256 与条件](static/inference-models/SOURCES.md) |
 
 管弦录音由 Sam Gossner、Simon Dalzell 等贡献，切片与处理署名见原项目和本地 provenance；本网站的 38 个片段保留原录音起音，处理循环、音量与淡化以适合实时声景。

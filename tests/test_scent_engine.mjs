@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {ScentSimulator, SimulationDriver} from '../static/scent-engine.mjs';
-import {recipeForScores} from '../static/scent-math.mjs';
+import {CHANNELS, EMOTIONS, normalizeRecipe, recipeForScores} from '../static/scent-math.mjs';
 
 const happy = () => recipeForScores({happiness: 1});
 const sad = () => recipeForScores({sadness: 1});
-const zeros = {citrus: 0, floral: 0, wood: 0, herbal: 0};
+const zeros = Object.fromEntries(CHANNELS.map(({key}) => [key, 0]));
 function setup() {
   let now = 0;
   const driver = new SimulationDriver();
@@ -60,13 +60,19 @@ test('new emotion is smoothed and pending while active recipe stays latched thro
   assert.equal(engine.snapshot().pending, true);
   const halfway = advance(8000);
   assert.deepEqual(halfway.activeRecipe, happy());
+  assert.equal(halfway.activeRecipe.emotionWeights.happiness, 1);
+  assert.equal(halfway.activeRecipe.contributions.bergamot.sadness, 0);
+  assert.equal(halfway.targetRecipe.emotionWeights.sadness, 1);
+  assert.ok(halfway.smoothedRecipe.emotionWeights.happiness > 0);
+  assert.ok(halfway.smoothedRecipe.emotionWeights.sadness > 0);
+  assert.deepEqual(halfway.smoothedRecipe, recipeForScores(halfway.smoothedRecipe.emotionWeights));
   assert.deepEqual(halfway.outputs, happy().percentages);
-  assert.ok(halfway.smoothedRecipe.percentages.citrus < happy().percentages.citrus);
-  assert.ok(halfway.smoothedRecipe.percentages.citrus > sad().percentages.citrus);
+  assert.ok(halfway.smoothedRecipe.percentages.bergamot < happy().percentages.bergamot);
+  assert.ok(halfway.smoothedRecipe.percentages.bergamot > sad().percentages.bergamot);
   assert.deepEqual(advance(21999).activeRecipe, happy());
   const next = advance(22000);
   assert.notDeepEqual(next.activeRecipe.percentages, happy().percentages);
-  assert.ok(next.activeRecipe.percentages.citrus < 15);
+  assert.ok(next.activeRecipe.percentages.bergamot < 15);
   assert.equal(Object.values(next.activeRecipe.percentages).reduce((a, b) => a + b), 100);
 });
 
@@ -76,7 +82,7 @@ test('repeating targets does not restart cycles or slow exponential convergence'
   for (let time = 1200; time <= 7000; time += 200) { a.advance(time); a.engine.setTarget(sad()); }
   b.advance(7000);
   assert.deepEqual(a.engine.snapshot().smoothedRecipe, b.engine.snapshot().smoothedRecipe);
-  assert.equal(a.engine.snapshot().smoothedRecipe.percentages.citrus, 27);
+  assert.equal(a.engine.snapshot().smoothedRecipe.percentages.bergamot, 15);
   assert.equal(a.engine.snapshot().phase, 'releasing');
   assert.equal(a.engine.snapshot().remaining, 2);
   assert.equal(a.engine.snapshot().cycles, 1);
@@ -143,10 +149,17 @@ test('incoming data cannot conceal a scheduler stall and backwards clocks fail s
 test('snapshots and input recipes cannot mutate engine state and logs remain bounded', () => {
   const {engine, advance} = setup();
   const recipe = happy(); engine.setTarget(recipe); engine.start();
-  recipe.percentages.citrus = 0;
-  const snapshot = engine.snapshot(); snapshot.activeRecipe.percentages.citrus = 0;
-  snapshot.logs[0].message = 'changed'; snapshot.targetRecipe.percentages.citrus = 0;
-  assert.equal(engine.snapshot().activeRecipe.percentages.citrus, 55);
+  recipe.percentages.bergamot = 0;
+  recipe.emotionWeights.happiness = 0;
+  recipe.contributions.bergamot.happiness = 999;
+  const snapshot = engine.snapshot(); snapshot.activeRecipe.percentages.bergamot = 0;
+  snapshot.logs[0].message = 'changed'; snapshot.targetRecipe.percentages.bergamot = 0;
+  snapshot.activeRecipe.emotionWeights.happiness = 0;
+  snapshot.targetRecipe.contributions.bergamot.happiness = 999;
+  snapshot.smoothedRecipe.emotionWeights.happiness = 0;
+  assert.equal(engine.snapshot().activeRecipe.percentages.bergamot, 32);
+  assert.equal(engine.snapshot().activeRecipe.emotionWeights.happiness, 1);
+  assert.equal(engine.snapshot().targetRecipe.contributions.bergamot.happiness, 32);
   assert.notEqual(engine.snapshot().logs[0].message, 'changed');
   advance(66000);
   assert.equal(engine.snapshot().logs.length, 8);
@@ -171,4 +184,60 @@ test('dispose clears outputs and prevents restarting without creating timers or 
   assert.throws(() => engine.start(), /已经关闭/);
   engine.setTarget(sad()); engine.tick();
   assert.equal(engine.snapshot().enabled, false); assert.deepEqual(engine.snapshot().outputs, zeros);
+});
+
+
+test('smoothing follows all emotion weights rather than attaching the newest source to old percentages', () => {
+  const {engine, advance} = setup();
+  const first = recipeForScores({happiness: 3, fear: 1});
+  const second = recipeForScores({sadness: 2, anger: 1, surprise: 1});
+  engine.setTarget(first); engine.start(); advance(1000); engine.setTarget(second);
+  const state = advance(7000);
+  const retained = Math.exp(-1);
+  for (const emotion of EMOTIONS) {
+    const expected = first.emotionWeights[emotion] * retained + second.emotionWeights[emotion] * (1 - retained);
+    assert.ok(Math.abs(state.smoothedRecipe.emotionWeights[emotion] - expected) < 1e-8);
+  }
+  assert.deepEqual(state.smoothedRecipe, recipeForScores(state.smoothedRecipe.emotionWeights));
+  assert.deepEqual(state.activeRecipe, first);
+  assert.deepEqual(state.targetRecipe, second);
+  for (const {key} of CHANNELS) {
+    assert.equal(Object.values(state.smoothedRecipe.contributions[key]).reduce((sum, points) => sum + Math.round(points * 10), 0), state.smoothedRecipe.percentages[key] * 10);
+  }
+});
+
+test('same rounded proportions still report a pending change when their sources differ', () => {
+  const {engine, advance} = setup();
+  engine.setTarget(happy()); engine.start(); advance(1000);
+  const almostHappy = recipeForScores({happiness: .99999, sadness: .00001});
+  assert.equal(almostHappy.code, happy().code);
+  engine.setTarget(almostHappy);
+  assert.equal(engine.snapshot().pending, true);
+  assert.equal(engine.snapshot().activeRecipe.emotionWeights.sadness, 0);
+  assert.equal(engine.snapshot().targetRecipe.emotionWeights.sadness, .00001);
+  const logs = engine.snapshot().logs.length;
+  engine.setTarget(almostHappy);
+  assert.equal(engine.snapshot().logs.length, logs);
+  assert.equal(engine.snapshot().cycles, 1);
+});
+
+test('manual recipes smooth without inventing a source and clear restores attribution', () => {
+  const {engine, advance} = setup();
+  const manual = normalizeRecipe({percentages: {...zeros, bergamot: 100}});
+  engine.setTarget(happy()); engine.start(); advance(1000); engine.setTarget(manual);
+  const blended = advance(7000);
+  assert.ok(blended.smoothedRecipe.percentages.bergamot > 32);
+  assert.ok(blended.smoothedRecipe.percentages.bergamot < 100);
+  assert.equal(blended.smoothedRecipe.emotionWeights, null);
+  assert.equal(blended.smoothedRecipe.contributions, null);
+  assert.deepEqual(blended.activeRecipe, happy());
+  engine.setTarget(sad());
+  assert.equal(advance(8000).smoothedRecipe.emotionWeights, null);
+  engine.stop('cleared');
+  engine.setTarget(sad()); engine.start();
+  assert.deepEqual(engine.snapshot().activeRecipe, sad());
+  engine.setTarget(null);
+  assert.equal(engine.snapshot().smoothedRecipe, null);
+  engine.setTarget(happy());
+  assert.deepEqual(engine.snapshot().activeRecipe, happy());
 });

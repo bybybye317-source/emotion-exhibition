@@ -9,10 +9,10 @@
   <link rel="icon" href="data:,">
   <title>群体肖像 · 机器如何理解人类的情绪</title>
   <link rel="stylesheet" href="./static/style.css?v=20261027-emotions">
-  <link rel="stylesheet" href="./static/gallery-theme.css?v=20261027-gallery">
+  <link rel="stylesheet" href="./static/gallery-theme.css?v=20261027-arrival">
   <script type="importmap">{"imports":{"three":"./static/vendor/three/three.module.js","three/addons/":"./static/vendor/three/addons/"}}</script>
-  <script type="module" src="./static/app.js?v=20261027-fragments"></script>
-  <script type="module" src="./static/portrait.js?v=20261027-collage"></script>
+  <script type="module" src="./static/app.js?v=20261027-arrival"></script>
+  <script type="module" src="./static/portrait.js?v=20261027-arrival"></script>
   <script type="module" src="./static/music.js?v=20261027-breath"></script>
   <script type="module" src="./static/scent.js"></script>
 </head>
@@ -122,6 +122,7 @@
       <div class="portrait-layout">
         <div id="portrait-workspace" class="portrait-workspace">
           <div id="portrait-stage" class="portrait-stage" aria-label="由观众照片组成的三维群体肖像" aria-describedby="portrait-controls-hint"></div>
+          <div id="portrait-arrival-note" class="portrait-arrival-note" aria-hidden="true" hidden><span>你的片段正在融入</span><strong id="portrait-arrival-location"></strong></div>
           <div class="portrait-toolbar">
             <p id="portrait-controls-hint" class="portrait-controls-hint"><svg class="icon" aria-hidden="true"><use href="#icon-pointer"></use></svg><span>拖动旋转 · 滚轮缩放</span></p>
             <div class="portrait-actions">

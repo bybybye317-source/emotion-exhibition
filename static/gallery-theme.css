@@ -243,3 +243,9 @@ input::file-selector-button:hover { background: #282b32; }
 @media(prefers-reduced-motion:reduce) {
   .music-emotion-choices button, .button { transition: none; }
 }
+
+/* A quiet location cue while a new contribution emerges. */
+.portrait-arrival-note { position: absolute; top: 22px; left: 24px; z-index: 1; max-width: calc(100% - 48px); pointer-events: none; text-shadow: 0 1px 10px #000; }
+.portrait-arrival-note span { display: block; font-size: 11px; line-height: 1.8; letter-spacing: .06em; color: #c8b693; }
+.portrait-arrival-note strong { display: block; font-size: 13px; font-weight: 400; line-height: 1.8; color: #e8e5df; }
+@media(max-width:560px) { .portrait-arrival-note { top: 16px; left: 18px; } }

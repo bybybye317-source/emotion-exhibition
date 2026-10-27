@@ -113,7 +113,7 @@ $('capture').addEventListener('click',()=>{
     if(captureRun!==run||disposed)return;captureRun=null;captureTimer=null;
     if(run.scores.length<6||!run.best){state.capture={status:'rejected',progress:0,detail:`有效画面 ${run.scores.length} 帧，至少需要 6 帧。请保持稳定重试，或用照片参与。`};render();return;}
     const scores=Object.fromEntries(EMOTION_KEYS.map(key=>[key,run.scores.reduce((sum,p)=>sum+(p[key]||0),0)/run.scores.length]));
-    session.add({scores,photoUrl:URL.createObjectURL(run.best.blob),anchors:run.best.anchors});state.capture={status:'completed',progress:1,detail:'采集完成，已加入你的群体作品。请下一位观众入镜。'};render();
+    session.add({scores,photoUrl:URL.createObjectURL(run.best.blob),anchors:run.best.anchors});state.capture={status:'completed',progress:1,detail:'采集完成，正在展示你贡献的片段。'};revealContribution();
   },3000);
 });
 $('reset-session').addEventListener('click',()=>{if(!session.records.length)return;if(confirm('清空当前浏览器本轮照片与记录？')){cancelCapture();session.reset();state.capture={status:'idle',detail:'本轮已清空，可以重新参与。',progress:0};render();}});
@@ -136,10 +136,23 @@ $('image-test-form').addEventListener('submit',async event=>{
   finally{bitmap?.close();testingImage=false;controls();render();}
 });
 $('add-image').addEventListener('click',()=>{
-  if(!testedImage)return;session.add({scores:testedImage.scores,photoUrl:URL.createObjectURL(testedImage.blob),anchors:testedImage.anchors});testedImage=null;$('image-test-detail').textContent='已加入当前群体作品，可以继续添加下一位。';state.capture={status:'completed',progress:1,detail:'照片已加入作品，视觉、音乐与气味目标已同步。'};render();
+  if(!testedImage)return;session.add({scores:testedImage.scores,photoUrl:URL.createObjectURL(testedImage.blob),anchors:testedImage.anchors});testedImage=null;$('image-test-detail').textContent='已加入当前群体作品，可以继续添加下一位。';state.capture={status:'completed',progress:1,detail:'照片已加入作品，正在展示你贡献的片段。'};revealContribution();
 });
 const views=['portrait','music','scent','capture'];const viewTitles={portrait:'群体肖像',music:'群体声景',scent:'群体气味',capture:'参与作品'};
 function selectView(name,focus=false){if(!views.includes(name))name='portrait';for(const view of views){const active=name===view;const tab=$(`nav-${view}`);tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;$(`${view}-panel`).hidden=!active;if(active&&focus)tab.focus();}$('page-title').textContent=viewTitles[name];document.title=`${viewTitles[name]} · 机器如何理解人类的情绪`;window.dispatchEvent(new Event('resize'));if(location.hash!==`#${name}-panel`)history.replaceState(null,'',`#${name}-panel`);}
+function revealContribution(){
+  // Publish the new record before revealing the stage so its arrival can be
+  // prepared while hidden, then begin once the audience can actually see it.
+  render();
+  const preview=$('artwork-preview');
+  if(preview.value!=='group'||$('portrait-preview').value!=='group'){
+    preview.value='group';
+    preview.dispatchEvent(new Event('change'));
+  }
+  selectView('portrait',true);
+  $('portrait-workspace').scrollIntoView({behavior:'instant',block:'center'});
+  window.dispatchEvent(new Event('portrait:reveal'));
+}
 function selectHashView(){const name=location.hash.replace(/^#/, '').replace(/-panel$/, '');selectView(views.includes(name)?name:'portrait');}
 window.addEventListener('hashchange',selectHashView);
 for(const [i,name] of views.entries()){

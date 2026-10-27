@@ -1,4 +1,4 @@
-import {MusicMatterVisual} from './music-visual.mjs?v=20261027-emotions';
+import {MusicMatterVisual} from './music-visual.mjs?v=20261027-breath';
 import {MUSIC_LAYERS} from './music-math.mjs?v=20261027-emotions';
 
 // The same engine and session used by playback own all visual inputs. No second
@@ -41,11 +41,12 @@ export function connectMusicVisual({engine, getState}) {
 
   function updateStatus(audio) {
     const state = getState();
+    const folding = Number(canvas.dataset.breath) > .001;
     const label = fullscreenNoticeUntil > performance.now() ? '当前无法进入全屏，可继续在此体验'
       : visualError ? '画面暂不可用 · 音乐可继续播放'
       : frozen ? '画面已暂停 · 声音可继续播放'
-      : !audio.playing ? '开启声音，唤醒形变'
-      : audio.volume === 0 ? '已静音 · 形变静息'
+      : !audio.playing ? folding ? '声音已暂停 · 缓慢收拢' : '开启声音，唤醒形变'
+      : audio.volume === 0 ? folding ? '已静音 · 缓慢收拢' : '已静音 · 形变静息'
       : reducedMotion.matches ? '随声流动 · 已减少动态'
       : state.preview ? '随声流动 · 情绪预览'
       : state.scores ? '随声流动 · 跟随群体' : '随声流动 · 待机声景';
@@ -90,7 +91,9 @@ export function connectMusicVisual({engine, getState}) {
     const playback = engine.getStatus();
     const state = getState();
     const next = JSON.stringify([playback.playing, playback.volume, state.scores, state.parameters, state.preview, frozen, reducedMotion.matches]);
-    if (force || next !== signature) { signature = next; settleUntil = performance.now() + 6000; }
+    // Keep drawing through the slow loudness envelope after mute/pause. The
+    // music phase stops immediately; the membrane needs time to fold inward.
+    if (force || next !== signature) { signature = next; settleUntil = performance.now() + 14000; }
     updateStatus(playback);
     if (!playback.playing || playback.volume === 0) {
       for (const meter of Object.values(meters)) meter.style.width = '0%';

@@ -44,6 +44,10 @@ export function liveAudioTargets(audio = {}, reducedMotion = false) {
   return {
     audible,
     drive: audible ? Math.min(1, Math.sqrt(rms) * 2.9) * amount : 0,
+    // Fixed post-volume calibration: a quiet passage cannot normalize itself
+    // into a loud one. Typical orchestral RMS .005 / .02 / .04 opens about
+    // 8% / 46% / 81%, leaving room for swells at the same volume setting.
+    breath: audible ? (1 - Math.exp(-Math.pow(rms / .028, 1.45))) * amount : 0,
     bass: band(audio?.bass), mid: band(audio?.mid), treble: band(audio?.treble), flux: band(audio?.flux),
     strings: layer(audio?.layers?.strings), brass: layer(audio?.layers?.brass),
     melody: layer(audio?.layers?.melody), synth: layer(audio?.layers?.synth),
@@ -54,7 +58,7 @@ export function createMatterState(profile = visualProfile(null)) {
   return {
     shape: Float32Array.from(profile.shape), colorA: Float32Array.from(profile.colorA), colorB: Float32Array.from(profile.colorB),
     form: Float32Array.from(profile.form), material: Float32Array.from(profile.material),
-    speed: profile.speed, phase: 7.5, drive: 0, bass: 0, mid: 0, treble: 0, flux: 0,
+    speed: profile.speed, phase: 7.5, drive: 0, breath: 0, bass: 0, mid: 0, treble: 0, flux: 0,
     strings: 0, brass: 0, melody: 0, synth: 0,
   };
 }
@@ -74,6 +78,11 @@ export function advanceMatterState(state, profile, audio, delta, reducedMotion =
     state[key] += (target[key] - state[key]) * (1 - Math.exp(-dt / tau));
     if (state[key] < .0001) state[key] = 0;
   }
+  // One slow envelope opens the entire folded surface. Its longer release
+  // lets silence gather the sheet back in, without a metronomic visual pulse.
+  const breathTau = target.breath > state.breath ? .55 : 2;
+  state.breath += (target.breath - state.breath) * (1 - Math.exp(-dt / breathTau));
+  if (target.breath === 0 && state.breath < .001) state.breath = 0;
   // No wall-clock pulse: a suspended context or actual zero output freezes phase.
   if (target.audible) state.phase = (state.phase + dt * target.drive * state.speed * (idleMusic ? .55 : 1)) % 10000;
   return state;

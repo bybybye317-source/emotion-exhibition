@@ -1,14 +1,18 @@
-import {VISUAL_EMOTIONS, visualProfile, createMatterState, advanceMatterState} from './music-visual-math.mjs?v=20261027-emotions';
+import {VISUAL_EMOTIONS, visualProfile, createMatterState, advanceMatterState} from './music-visual-math.mjs?v=20261027-breath';
 
 const vertex = `
 precision highp float;
 attribute vec2 aUv;
 uniform float uTime;uniform float uAspect;uniform vec4 uMood;uniform vec4 uForm;
-uniform vec4 uAudio;uniform vec4 uLayers;uniform float uDrive;
+uniform vec4 uAudio;uniform vec4 uLayers;uniform float uDrive;uniform float uBreath;
 varying vec3 vNormal;varying vec3 vPosition;varying vec2 vUv;varying float vCrease;
 mat2 rot(float a){return mat2(cos(a),-sin(a),sin(a),cos(a));}
 vec3 surface(vec2 uv){
- float a=-.65+uv.x*uForm.w;
+ // Quiet gathers the rolled sheet inward; a sustained swell opens its arc.
+ // This changes the surface itself, not the camera or a screen-space zoom.
+ float open=clamp(uBreath,0.,1.);
+ float arc=min(6.15,uForm.w+.42)-.70*open;
+ float a=-.65+uv.x*arc;
  float v=(uv.y-.5)*2.;
  float t=uTime*.22;
  float wave=sin(a*(3.-uMood.x*.65)+v*2.4-t)*(.13+uAudio.y*.048+uLayers.x*.035);
@@ -20,12 +24,15 @@ vec3 surface(vec2 uv){
  wave+=uMood.w*.026*uDrive*sin(v*29.+a*17.-t*9.)*exp(-pow(v-.28,2.)*10.);
  // A spectral onset travels through a localized crease, rather than shaking the camera.
  wave+=uAudio.w*.072*sin(a*9.-v*6.-t*4.)*exp(-pow(v-.25*sin(a*2.),2.)*5.);
+ wave*=.55+.65*open;
  float radius=.76+wave+.05*sin(v*4.-t);
+ radius*=.90+.10*open;
  radius*=1.+uAudio.x*(.10+uMood.z*.12)+uLayers.y*.055;
  radius*=1.+uMood.x*.14*sin(a*.5)+uMood.z*.055*uDrive*sin(t*3.-a*2.);
  float h=.63+.17*sin(a*1.4)+.10*sin(a*2.9);
  float y=v*h;
  float curl=pow(abs(v),3.)*(.17+.12*sin(a*2.)+uAudio.z*.04+uMood.w*.16-uMood.x*.07);
+ curl+=pow(abs(v),3.)*.10*(1.-open);
  radius+=curl;
  y+=.10*sin(a*3.5+v*3.+t*.6);
  y-=uMood.y*(.10+.30*pow(abs(v),2.)+.10*sin(a*1.2));
@@ -36,8 +43,9 @@ vec3 surface(vec2 uv){
  p.xz=rot(y*(.58+uLayers.w*.12+uMood.w*.52)+.17*sin(y*2.-t*.3))*p.xz;
  p.yz=rot(.24)*p.yz;
  p.xz=rot(-.52+.065*sin(t*.37))*p.xz;
- p.x*=uForm.x;
- p.y*=uForm.y;
+ p.x*=uForm.x*(.75+.37*open);
+ p.y*=uForm.y*(.82+.24*open);
+ p.z*=.92+.08*open;
  p.x+=uMood.w*.16*v*v;
  p.xy=rot(uForm.z)*p.xy;
  p.y+=uMood.x*.02+uMood.y*.22;
@@ -54,7 +62,7 @@ void main(){
  // Fit the broadest folded sheet in portrait as well as landscape; keep the
  // heading and transport clear even when real audio expands the membrane.
  float fit=min(1.,uAspect/1.15);
- gl_Position=vec4(p.x*1.46*fit/uAspect,p.y*1.46*fit+.025*z,1.01*z-.2,z);
+ gl_Position=vec4(p.x*1.34*fit/uAspect,p.y*1.34*fit+.025*z,1.01*z-.2,z);
 }`;
 
 const fragment = `
@@ -177,7 +185,7 @@ export class MusicMatterVisual {
       this.indices=this._own('Buffer', gl.createBuffer());gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,this.indices);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,indices,gl.STATIC_DRAW);
       this.quad=this._own('Buffer', gl.createBuffer());gl.bindBuffer(gl.ARRAY_BUFFER,this.quad);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,-1,1,1,-1,1,1]),gl.STATIC_DRAW);
       this.meshAttr=gl.getAttribLocation(this.mesh,'aUv');this.postAttr=gl.getAttribLocation(this.post,'aPosition');
-      this.uniforms={};for(const name of ['uTime','uAspect','uMood','uForm','uMaterial','uColorA','uColorB','uAudio','uLayers','uDrive'])this.uniforms[name]=gl.getUniformLocation(this.mesh,name);
+      this.uniforms={};for(const name of ['uTime','uAspect','uMood','uForm','uMaterial','uColorA','uColorB','uAudio','uLayers','uDrive','uBreath'])this.uniforms[name]=gl.getUniformLocation(this.mesh,name);
       this.imageLocation=gl.getUniformLocation(this.post,'uImage');this.sizeLocation=gl.getUniformLocation(this.post,'uSize');
       this.target=this._own('Framebuffer',gl.createFramebuffer());this.texture=this._own('Texture',gl.createTexture());this.depth=this._own('Renderbuffer',gl.createRenderbuffer());
       gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
@@ -220,10 +228,10 @@ export class MusicMatterVisual {
     this._audioUniform.set([s.bass,s.mid,s.treble,s.flux]);this._layerUniform.set([s.strings,s.brass,s.melody,s.synth]);
     gl.viewport(0,0,this.canvas.width,this.canvas.height);gl.bindFramebuffer(gl.FRAMEBUFFER,this.target);gl.enable(gl.DEPTH_TEST);gl.clearColor(0,0,0,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.mesh);
     gl.bindBuffer(gl.ARRAY_BUFFER,this.vertices);gl.enableVertexAttribArray(this.meshAttr);gl.vertexAttribPointer(this.meshAttr,2,gl.FLOAT,false,0,0);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,this.indices);
-    gl.uniform1f(u.uTime,s.phase);gl.uniform1f(u.uAspect,this.canvas.width/this.canvas.height);gl.uniform4fv(u.uMood,s.shape);gl.uniform4fv(u.uForm,s.form);gl.uniform4fv(u.uMaterial,s.material);gl.uniform3fv(u.uColorA,s.colorA);gl.uniform3fv(u.uColorB,s.colorB);gl.uniform4fv(u.uAudio,this._audioUniform);gl.uniform4fv(u.uLayers,this._layerUniform);gl.uniform1f(u.uDrive,s.drive);
+    gl.uniform1f(u.uTime,s.phase);gl.uniform1f(u.uAspect,this.canvas.width/this.canvas.height);gl.uniform4fv(u.uMood,s.shape);gl.uniform4fv(u.uForm,s.form);gl.uniform4fv(u.uMaterial,s.material);gl.uniform3fv(u.uColorA,s.colorA);gl.uniform3fv(u.uColorB,s.colorB);gl.uniform4fv(u.uAudio,this._audioUniform);gl.uniform4fv(u.uLayers,this._layerUniform);gl.uniform1f(u.uDrive,s.drive);gl.uniform1f(u.uBreath,s.breath);
     gl.drawElements(gl.TRIANGLES,this._count,gl.UNSIGNED_SHORT,0);
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.disable(gl.DEPTH_TEST);gl.useProgram(this.post);gl.bindBuffer(gl.ARRAY_BUFFER,this.quad);gl.enableVertexAttribArray(this.postAttr);gl.vertexAttribPointer(this.postAttr,2,gl.FLOAT,false,0,0);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.texture);gl.uniform1i(this.imageLocation,0);gl.uniform2f(this.sizeLocation,this.canvas.width,this.canvas.height);gl.drawArrays(gl.TRIANGLES,0,6);
-    this.canvas.dataset.emotion=this._profile.dominant;this.canvas.dataset.drive=s.drive.toFixed(4);this.canvas.dataset.phase=s.phase.toFixed(4);this.canvas.dataset.frame=String(++this._frames);
+    this.canvas.dataset.emotion=this._profile.dominant;this.canvas.dataset.drive=s.drive.toFixed(4);this.canvas.dataset.breath=s.breath.toFixed(4);this.canvas.dataset.phase=s.phase.toFixed(4);this.canvas.dataset.frame=String(++this._frames);
     return true;
   }
   _release() {

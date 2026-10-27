@@ -1,6 +1,6 @@
 import { EmotionMusicEngine } from './music-engine.mjs?v=20261027-emotions';
 import { musicParameters, groupDiversity } from './music-math.mjs?v=20261027-emotions';
-import { connectMusicVisual } from './music-visual-controller.mjs?v=20261027-emotions';
+import { connectMusicVisual } from './music-visual-controller.mjs?v=20261027-breath';
 
 const $ = id => document.getElementById(id);
 const labels = { happiness: '快乐', neutral: '中性', sadness: '悲伤', surprise: '惊讶', anger: '愤怒', fear: '恐惧', disgust: '厌恶', contempt: '轻蔑' };

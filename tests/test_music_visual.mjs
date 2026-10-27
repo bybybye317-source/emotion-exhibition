@@ -53,6 +53,44 @@ test('post-output silence closes every visual drive even when pre-master layers 
  assert.equal(silent.audible,false);for(const [key,value]of Object.entries(silent))if(key!=='audible')assert.equal(value,0);
  const paused=liveAudioTargets({...sound,playing:false});assert.deepEqual(paused,silent);
 });
+test('fixed loudness mapping keeps quiet, ordinary and strong passages visibly separated',()=>{
+ const levels=[0,.001,.005,.01,.02,.04,.1,1].map(rms=>liveAudioTargets({...sound,rms}).breath);
+ levels.forEach((level,i)=>{assert.ok(level>=0&&level<=1);if(i)assert.ok(level>levels[i-1]);});
+ assert.ok(levels[2]<.1,'a quiet passage stays gathered');
+ assert.ok(levels[4]>.4&&levels[4]<.6,'ordinary output leaves headroom for a swell');
+ assert.ok(levels[5]>.8&&levels[5]<.9,'strong sound opens substantially further');
+ const same=liveAudioTargets({...sound,rms:.02,layers:{strings:1},bass:1,flux:1});
+ near(same.breath,levels[4]);
+});
+test('the whole-surface envelope rises gently then gathers over several seconds of silence',()=>{
+ const profile=visualProfile({happiness:1}),state=createMatterState(profile),target=liveAudioTargets(sound).breath;
+ advanceMatterState(state,profile,sound,1/30);
+ assert.ok(state.breath>0&&state.breath<target*.07,'one frame cannot snap the surface open');
+ for(let i=1;i<15;i++)advanceMatterState(state,profile,sound,1/30);
+ assert.ok(state.breath>target*.5&&state.breath<target*.7,'opening should register in roughly half a second');
+ for(let i=0;i<105;i++)advanceMatterState(state,profile,sound,1/30);
+ const open=state.breath,phase=state.phase;
+ for(let i=0;i<30;i++)advanceMatterState(state,profile,{playing:false,rms:0},1/30);
+ assert.equal(state.phase,phase);assert.equal(state.drive,0);
+ assert.ok(state.breath>open*.5&&state.breath<open*.7,'silence keeps a visible, smoothly receding after-motion');
+ let previous=state.breath;
+ for(let i=0;i<390;i++){
+  advanceMatterState(state,profile,{playing:false,rms:0},1/30);
+  assert.ok(state.breath<=previous);previous=state.breath;
+ }
+ assert.equal(state.breath,0,'contraction completes inside the controller settle window');
+});
+test('brief transients cannot pump the whole form and envelope timing is frame-rate independent',()=>{
+ const profile=visualProfile({fear:1}),a=createMatterState(profile),b=createMatterState(profile);
+ for(let i=0;i<3;i++)advanceMatterState(a,profile,sound,1/30);
+ assert.ok(a.breath<.15,'a 100ms transient is smoothed rather than making a full-size hit');
+ for(let i=0;i<6;i++)advanceMatterState(b,profile,sound,1/60);
+ near(a.breath,b.breath);
+ for(let i=0;i<60;i++)advanceMatterState(a,profile,{playing:true,rms:.001},1/30);
+ for(let i=0;i<120;i++)advanceMatterState(b,profile,{playing:true,rms:.001},1/60);
+ near(a.breath,b.breath);
+ const before=a.breath;advanceMatterState(a,profile,sound,0);near(a.breath,before);
+});
 test('missing and malformed audio cannot introduce NaN, movement or out-of-range values',()=>{
  for(const audio of [undefined,null,{}, {playing:true,rms:NaN,bass:Infinity},{playing:true,rms:-1},{playing:true,rms:3,bass:Infinity,mid:2,treble:-1,layers:{strings:NaN}}]){
   const targets=liveAudioTargets(audio);
@@ -80,6 +118,7 @@ test('emotion changes ease without replacing a mixed mood with its dominant labe
 test('reduced motion preserves audio correspondence at lower amplitude and speed',()=>{
  const full=liveAudioTargets(sound),reduced=liveAudioTargets(sound,true);
  assert.ok(reduced.drive>0&&reduced.drive<full.drive/2);assert.ok(reduced.bass<full.bass/2);
+ assert.ok(reduced.breath>0&&reduced.breath<full.breath/4);
  const p=visualProfile({fear:1}),a=createMatterState(p),b=createMatterState(p);
  advanceMatterState(a,p,sound,.1,false);advanceMatterState(b,p,sound,.1,true);
  assert.ok(b.phase>7.5&&b.phase<a.phase);

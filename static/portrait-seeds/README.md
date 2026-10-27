@@ -22,3 +22,5 @@
 Each tile was cropped with browser `createImageBitmap` and processed locally using the project's bundled MediaPipe FaceLandmarker (`face_landmarker.task`, CPU delegate, image mode, maximum 2 faces, detection and presence confidence thresholds 0.5). Exactly one face was detected in each of all 20 tiles. The existing `alignmentAnchors` function in `static/browser-inference.mjs` produced `photo_anchors`; each coordinate is normalized to its individual tile, rather than to the atlas. All stored coordinates were checked to be finite and within `[0, 1]`.
 
 The manifest contains geometry only. There are no emotion scores, identities, participant timestamps, or fabricated observation records. Analysis used a temporary headless browser on the local asset server; it did not access a camera.
+
+On 2026-10-28 the existing atlas was reprocessed with the same local analyzer to retain 14 additional eye-corner, eyelid and eyebrow anchors for the anatomical collage. All 20 tiles passed one-face detection. The image bytes and SHA-256 remain unchanged; only geometric metadata was extended.

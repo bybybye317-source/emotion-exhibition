@@ -39,7 +39,7 @@ export class FragmentArrival {
       this._mix=this._reducedFrom+(1-this._reducedFrom)*progress;
       this._glow=0;
     } else {
-      this._mix=smootherstep(this._elapsed/REVEAL_SECONDS);
+      this._mix=smootherstep((this._elapsed-.95)/(REVEAL_SECONDS-.95));
       this._glow=smootherstep(this._elapsed/.45)*(1-smootherstep((this._elapsed-1.8)/1.4));
     }
     if(this._elapsed>=end) {this._mix=1;this._glow=0;this._active=false;}
@@ -87,4 +87,11 @@ export function blendLinearPixels(fromRGBA,toRGBA,mix,outRGBA) {
     output[i+3]=255;
   }
   return output;
+}
+
+export function contributionMotion(elapsed,{active=true,reduced=false}={}){
+ if(!active||reduced)return {travel:1,opacity:0,line:0,stage:'settled'};
+ const t=Number.isFinite(elapsed)?Math.max(0,elapsed):0;
+ return {travel:smootherstep((t-.65)/.8),opacity:1-smootherstep((t-1)/.45),line:1-smootherstep((t-2.4)/.8),
+  stage:t<.65?'source':t<1.45?'travelling':t<2.4?'merging':'settled'};
 }

@@ -8,7 +8,7 @@ self.onmessage = async ({data}) => {
   try {
     if (type === 'init') {
       if (!initializing) initializing = (async () => {
-        const {BrowserInferenceCore} = await import('./browser-inference.mjs?v=20261027-sculpture');
+        const {BrowserInferenceCore} = await import('./browser-inference.mjs?v=20261028-anatomy');
         analyzer = new BrowserInferenceCore();
         await analyzer.init(message => self.postMessage({id, type: 'progress', message}));
       })();

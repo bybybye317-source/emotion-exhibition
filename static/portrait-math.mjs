@@ -1,3 +1,4 @@
+import {anatomicalFragmentCells} from './portrait-regions.mjs?v=20261028-anatomy';
 // Artistic expression mapping: these are animation choices, not measured AUs.
 export const LABELS = {happiness:'快乐', neutral:'中性', sadness:'悲伤', surprise:'惊讶', anger:'愤怒', fear:'恐惧', disgust:'厌恶', contempt:'轻蔑'};
 
@@ -114,12 +115,14 @@ export function voronoiCells(seeds = PATCH_SEEDS) {
 }
 
 /**
- * A gently curved version of the fixed partition, without changing ownership.
+ * The default is the anatomical partition. Custom seed callers retain the
+ * legacy gently curved Voronoi partition, without changing ownership.
  * Build every shared edge once in canonical direction: neighbouring masks use
  * precisely the same points in reverse, so the bends cannot open hairline gaps.
  * A static, low-amplitude field moves only mask edges, never facial landmarks.
  */
-export function organicFragmentCells(seeds = PATCH_SEEDS) {
+export function organicFragmentCells(seeds) {
+  if(seeds===undefined)return anatomicalFragmentCells();
   const precision=1e12;
   const canonical=point=>point.map(value=>Math.round(Math.max(0,Math.min(1,value))*precision)/precision);
   const key=point=>point.join(',');

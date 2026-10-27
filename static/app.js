@@ -1,4 +1,4 @@
-import {BrowserEmotionAnalyzer} from './browser-inference.mjs?v=20261027-sculpture';
+import {BrowserEmotionAnalyzer} from './browser-inference.mjs?v=20261028-anatomy';
 import {LocalSession, EMOTION_KEYS} from './session-state.mjs?v=20261027-fragments';
 import {CAPTURE_POLICY, CAPTURE_DURATION_LABEL, CaptureWindow} from './capture-window.mjs?v=20261028-fast';
 

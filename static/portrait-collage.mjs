@@ -1,4 +1,5 @@
-import {affineFromTriangles, photoTriangle, organicFragmentCells, planPatchAssignments} from './portrait-math.mjs?v=20261027-collage';
+import {refineFeatureWarp} from './portrait-features.mjs?v=20261028-anatomy';
+import {affineFromTriangles, photoTriangle, organicFragmentCells, planPatchAssignments} from './portrait-math.mjs?v=20261028-anatomy';
 
 const DEFAULT_COLOR = '#aaa69e';
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -93,7 +94,7 @@ function contourMouthWarp(src,dst,anchors,target,width,height) {
 }
 
 /** Pure warp geometry, shared by rendering and tests. Target points are pixels. */
-export function photoWarpGeometry(anchors, width, height, target, size) {
+function basePhotoWarpGeometry(anchors, width, height, target, size) {
   const source=photoTriangle(anchors,width,height);
   const targetTriangle=[target.left_eye,target.right_eye,target.mouth];
   const inverse=affineFromTriangles(targetTriangle,source);
@@ -115,6 +116,16 @@ export function photoWarpGeometry(anchors, width, height, target, size) {
   }
   src.push(source[2]);dst.push(target.mouth);
   return {source:src,target:dst,denseMouth:false,triangles:[[0,1,5],[0,5,4],[0,4,3],[1,2,5],[2,7,5],[2,3,7],[3,4,7],[4,5,6],[5,7,6],[7,4,6]]};
+}
+
+export function photoWarpGeometry(anchors,width,height,target,size) {
+  let base=basePhotoWarpGeometry(anchors,width,height,target,size);
+  if(base?.triangles.some(t=>signedArea(...t.map(i=>base.source[i])) < -1e-6)) {
+    // Badly tracked lips must not fold a photographed cheek over itself.
+    base=basePhotoWarpGeometry(Object.fromEntries(['left_eye','right_eye','nose','mouth'].map(k=>[k,anchors[k]])),width,height,target,size);
+  }
+  if(base?.triangles.some(t=>signedArea(...t.map(i=>base.source[i])) < -1e-6))return null;
+  return anchors?.left_eye_outer ? refineFeatureWarp(base,anchors,target,width,height) : base;
 }
 
 function polygon(ctx, points, expansion = 0) {

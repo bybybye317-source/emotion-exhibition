@@ -47,7 +47,7 @@ const distanceToSegment=(p,a,b)=>{
 };
 
 test('mask curvature is small and deterministic while the original partition stays unchanged',()=>{
-  const seeds=structuredClone(PATCH_SEEDS),straight=voronoiCells(),curved=organicFragmentCells();
+  const seeds=structuredClone(PATCH_SEEDS),straight=voronoiCells(),curved=organicFragmentCells(PATCH_SEEDS);
   let maximumDeviation=0;
   for(const [index,cell] of curved.entries())for(const point of cell) {
     const original=straight[index];
@@ -56,7 +56,7 @@ test('mask curvature is small and deterministic while the original partition sta
     assert(deviation<=3.6/1024+1e-10,'curvature never displaces the patch into distant facial anatomy');
   }
   assert(maximumDeviation>.001,'the boundary visibly departs from a straight cut');
-  assert.deepEqual(organicFragmentCells(),curved);
+  assert.deepEqual(organicFragmentCells(PATCH_SEEDS),curved);
   assert.deepEqual(voronoiCells(),straight);
   assert.deepEqual(PATCH_SEEDS,seeds);
 });

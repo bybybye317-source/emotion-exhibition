@@ -9,12 +9,12 @@
   <link rel="icon" href="data:,">
   <title>群体肖像 · 机器如何理解人类的情绪</title>
   <link rel="stylesheet" href="./static/style.css?v=20261027-emotions">
-  <link rel="stylesheet" href="./static/gallery-theme.css?v=20261027-arrival">
+  <link rel="stylesheet" href="./static/gallery-theme.css?v=20261028-anatomy">
   <link rel="stylesheet" href="./static/scent-instrument.css?v=20261028-flow">
   <link rel="stylesheet" href="./static/scent-atelier.css?v=20261028-flow">
   <script type="importmap">{"imports":{"three":"./static/vendor/three/three.module.js","three/addons/":"./static/vendor/three/addons/"}}</script>
-  <script type="module" src="./static/app.js?v=20261028-fast"></script>
-  <script type="module" src="./static/portrait.js?v=20261028-fast"></script>
+  <script type="module" src="./static/app.js?v=20261028-anatomy"></script>
+  <script type="module" src="./static/portrait.js?v=20261028-anatomy"></script>
   <script type="module" src="./static/music.js?v=20261028-fast"></script>
   <script type="module" src="./static/scent.js?v=20261028-fast"></script>
 </head>
@@ -124,6 +124,12 @@
       <div class="portrait-layout">
         <div id="portrait-workspace" class="portrait-workspace">
           <div id="portrait-stage" class="portrait-stage" aria-label="由观众照片组成的三维群体肖像" aria-describedby="portrait-controls-hint"></div>
+          <div id="portrait-piece-card" class="portrait-piece-card" aria-hidden="true" hidden>
+            <span id="portrait-piece-title">这是你贡献的片段</span>
+            <div id="portrait-piece-image" class="portrait-piece-image"></div>
+            <strong id="portrait-piece-location"></strong>
+          </div>
+          <svg id="portrait-piece-guide" class="portrait-piece-guide" aria-hidden="true" hidden><path id="portrait-piece-line"/><circle id="portrait-piece-dot" r="3"/></svg>
           <div id="portrait-arrival-note" class="portrait-arrival-note" aria-hidden="true" hidden><span>你的片段正在融入</span><strong id="portrait-arrival-location"></strong></div>
           <div class="portrait-toolbar">
             <p id="portrait-controls-hint" class="portrait-controls-hint"><svg class="icon" aria-hidden="true"><use href="#icon-pointer"></use></svg><span>拖动旋转 · 滚轮缩放</span></p>
@@ -140,6 +146,7 @@
           <button id="portrait-retry-model" class="button secondary compact" type="button" hidden>重试三维肖像</button>
           <button id="portrait-retry-seeds" class="button secondary compact" type="button" hidden>重试初始面孔</button>
           <p id="portrait-empty-hint" class="portrait-description">20 张虚构面孔，各取一部分，拼成一张共同的脸。每位观众加入时，只替换其中一块。</p>
+          <button id="portrait-show-piece" class="button subtle compact portrait-show-piece" type="button" disabled>查看我的片段 <span aria-hidden="true">↗</span></button>
           <section class="portrait-distribution" aria-labelledby="portrait-emotions-title">
             <h3 id="portrait-emotions-title">群体表情</h3>
             <div id="portrait-emotions" class="scores compact-scores"><p class="portrait-no-data">暂无数据<br><span>当有观众完成采集后，将分析并展示群体的表情倾向。</span></p></div>

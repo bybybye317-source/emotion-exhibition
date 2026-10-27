@@ -37,7 +37,18 @@ export function alignmentAnchors(landmarks) {
   // Preserve the original four anchors exactly. Separate lip and opening
   // anchors let the portrait compress photographed teeth into its mouth gap
   // instead of projecting a broad open smile across the physical lips.
+  const features={};
+  const eyeGroups=[{corner:[33,133],upper:159,lower:145,brow:[70,105,107]},
+    {corner:[263,362],upper:386,lower:374,brow:[300,334,336]}]
+    .sort((a,b)=>average(...a.corner)[0]-average(...b.corner)[0]);
+  for(const [i,group] of eyeGroups.entries()){
+    const side=i?'right':'left',sorted=group.corner.map(point).sort((a,b)=>a[0]-b[0]);
+    features[`${side}_eye_outer`]=sorted[i?1:0];features[`${side}_eye_inner`]=sorted[i?0:1];
+    features[`${side}_eye_upper`]=point(group.upper);features[`${side}_eye_lower`]=point(group.lower);
+    ['outer','middle','inner'].forEach((name,j)=>features[`${side}_brow_${name}`]=point(group.brow[j]));
+  }
   return {
+    ...features,
     left_eye: eyes[0], right_eye: eyes[1], nose: point(1), mouth: average(13, 14),
     mouth_left: corners[0], mouth_right: corners[1],
     mouth_upper_outer: point(0), mouth_upper_inner: point(13),
@@ -230,7 +241,7 @@ export class BrowserEmotionAnalyzer {
         this._core ||= new BrowserInferenceCore();
         await this._core.init(onProgress);
       } else {
-        this._worker = new Worker(local('./inference-worker.js?v=20261027-sculpture'));
+        this._worker = new Worker(local('./inference-worker.js?v=20261028-anatomy'));
         this._worker.onmessage = ({data}) => {
           const request = this._pending.get(data.id);
           if (!request) return;

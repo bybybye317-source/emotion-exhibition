@@ -1,16 +1,19 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {createAlignedPhoto, paintCollage} from './portrait-collage.mjs?v=20261027-arrival';
-import {ARRIVAL_SECONDS, FragmentArrival, blendLinearPixels} from './portrait-arrival.mjs?v=20261028-fast';
-import {LABELS, morphWeights, normalizeScores, organicFragmentCells, planPatchAssignments} from './portrait-math.mjs?v=20261027-arrival';
+import {createAlignedPhoto, paintCollage} from './portrait-collage.mjs?v=20261028-anatomy';
+import {ARRIVAL_SECONDS, FragmentArrival, blendLinearPixels} from './portrait-arrival.mjs?v=20261028-anatomy';
+import {LABELS, morphWeights, normalizeScores, organicFragmentCells, planPatchAssignments} from './portrait-math.mjs?v=20261028-anatomy';
+
+import {calibratedProjection} from './portrait-features.mjs?v=20261028-anatomy';
+import {ContributionGuide} from './portrait-contribution.mjs?v=20261028-anatomy';
 
 const $ = id => document.getElementById(id);
 const SIZE = 1024;
 const BASE_COLOR = '#aeb0ae';
 const SEED_URL = new URL('./portrait-seeds/manifest.json', import.meta.url);
 const photoKey = record => JSON.stringify([record.id,record.image_url,record.photo_anchors]);
-const REGION_NAMES=['左侧额头','额头中央','右侧额头','左侧太阳穴','左侧眼周','右侧眼周','右侧太阳穴','左侧脸颊外缘','左侧脸颊','鼻梁','右侧脸颊','右侧脸颊外缘','左侧下颊','左侧嘴角','嘴唇周围','右侧嘴角','右侧下颊','左侧下颌','下巴中央','右侧下颌'];
+const REGION_NAMES=['左侧额头','额头中央','右侧额头','左侧太阳穴','左侧眉眼','右侧眉眼','右侧太阳穴','左侧脸颊外缘','左侧脸颊','鼻梁与鼻翼','右侧脸颊','右侧脸颊外缘','左侧下颊','左侧嘴角','完整唇部','右侧嘴角','右侧下颊','左侧下颌','下巴中央','右侧下颌'];
 const MODEL_URL = new URL('./models/sculpture-head.glb', import.meta.url);
 const clamp01 = value => Math.min(1,Math.max(0,value));
 const smooth = (a,b,x) => {const t=clamp01((x-a)/(b-a));return t*t*(3-2*t);};
@@ -37,7 +40,7 @@ class GroupPortrait {
     this.arrivalMaskTexture=new THREE.CanvasTexture(this.arrivalMask);
     this.arrivalMaskTexture.flipY=true;this.arrivalMaskTexture.generateMipmaps=false;
     this.arrivalMaskTexture.minFilter=THREE.LinearFilter;
-    this.arrivalPhase='idle';
+    this.arrivalPhase='idle';this.contribution=new ContributionGuide(stage);
     this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
     this.scene=new THREE.Scene();
     this.scene.background=new THREE.Color(getComputedStyle(stage).getPropertyValue('--portrait-stage-bg').trim() || '#080a0d');
@@ -83,7 +86,9 @@ class GroupPortrait {
       const gltf=await new GLTFLoader().loadAsync(MODEL_URL.href);
       if(this.disposed){gltf.scene.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});return;}
       candidate=gltf.scene;
-      this.projection=candidate.userData;
+      const geometry=candidate.getObjectByName('SculptureHead').geometry;
+      const positions=geometry.attributes.position;
+      this.projection=calibratedProjection(candidate.userData,i=>[positions.getX(i),positions.getY(i),positions.getZ(i)]);
       // Projection is calibrated from the neutral asset, and remains attached
       // to vertices during expression morphing instead of sliding over the face.
       if(!this.projection.bounds||!this.projection.landmarks)throw new Error('缺少脸模的照片校准数据');
@@ -158,6 +163,7 @@ class GroupPortrait {
   bindControls() {
     $('portrait-retry-seeds').addEventListener('click',()=>this.loadSeedPhotos());
     $('portrait-retry-model').addEventListener('click',()=>this.loadModel());
+    $('portrait-show-piece').addEventListener('click',()=>this.replayContribution());
     $('portrait-reset-view').addEventListener('click',()=>this.resetView());
     $('portrait-rotate').addEventListener('click',()=>{
       this.autoRotate=!this.autoRotate;
@@ -265,6 +271,7 @@ class GroupPortrait {
     if($('portrait-empty-hint').textContent!==detail)$('portrait-empty-hint').textContent=detail;
     $('portrait-empty-hint').hidden=false;
     $('portrait-retry-seeds').hidden=!this.seedFailure;
+    $('portrait-show-piece').disabled=arrival.active||!this.records.some(record=>this.photoCache.has(photoKey(record)));
     this.stage.dataset.participants=String(this.records.length);
     this.stage.dataset.photos=String(this.loadedCount);
     this.stage.dataset.seeds=this.seedAtlas?'20':'0';
@@ -280,7 +287,7 @@ class GroupPortrait {
     let image=null,assembled=null;
     const aligned=[];
     try {
-      const response=await fetch(SEED_URL,{signal:this.seedAbort.signal});
+      const response=await fetch(new URL('./portrait-seeds/manifest.json?v=20261028-anatomy',import.meta.url),{signal:this.seedAbort.signal});
       if(!response.ok)throw new Error('初始面孔清单不可用');
       const manifest=await response.json();
       if(manifest.faces?.length!==20)throw new Error('初始面孔数量不完整');
@@ -374,13 +381,29 @@ class GroupPortrait {
       this.lastArrivalSlots=revealSlots;
       this.arrival.begin(revealSlots,{reducedMotion:this.reducedMotion.matches});
       this.paintArrivalMask(revealSlots);this.arrivalUniform.value=0;this.glowUniform.value=0;
-      this.photoUniform.value=1;
+      this.photoUniform.value=1;this.prepareContribution(revealSlots.at(-1));
     } else {
-      this.arrival.clear();this.arrivalUniform.value=1;this.glowUniform.value=0;
+      this.arrival.clear();this.contribution.clear();this.arrivalUniform.value=1;this.glowUniform.value=0;
       this.snapshotAppearance();this.paintArrivalMask([]);
       if(!this.records.length)this.lastArrivalSlots=[];
     }
     this.syncArrivalDisplay(this.arrival.snapshot());
+  }
+
+  prepareContribution(slot,replay=false) {
+    const patch=planPatchAssignments(this.records)[slot],record=this.records[patch?.recordIndex];
+    this.contribution.show({image:record&&this.photoCache.get(photoKey(record)),slot,head:this.head,location:`画面${REGION_NAMES[slot]}`,replay});
+  }
+
+  replayContribution() {
+    const record=[...this.records].reverse().find(record=>this.photoCache.has(photoKey(record)));
+    if(!record||!this.ready)return;
+    this.snapshotAppearance();this.lastArrivalSlots=[record.slot];this.resetView();
+    this.arrival.begin([record.slot],{reducedMotion:this.reducedMotion.matches});this.paintArrivalMask([record.slot]);
+    // Replay is a guide only: both atlases hold the already settled face.
+    this.fromContext.clearRect(0,0,SIZE,SIZE);this.fromContext.drawImage(this.atlas,0,0);this.fromTexture.needsUpdate=true;
+    this.prepareContribution(record.slot,true);this.syncArrivalDisplay(this.arrival.snapshot());
+    $('portrait-workspace').scrollIntoView({behavior:'instant',block:'center'});
   }
 
   syncArrivalDisplay(arrival) {
@@ -453,7 +476,7 @@ class GroupPortrait {
     const wasActive=this.arrival.snapshot().active;
     const arrival=this.arrival.advance(delta,{visible,reducedMotion:this.reducedMotion.matches});
     if(wasActive||arrival.active)this.syncArrivalDisplay(arrival);
-    if(wasActive&&!arrival.active){this.snapshotAppearance();this.paintArrivalMask([]);}
+    if(wasActive&&!arrival.active){this.snapshotAppearance();this.paintArrivalMask([]);if(!this.reducedMotion.matches)this.contribution.clear();}
     if(document.hidden||rect.width<1)return;
     const alpha=1-Math.exp(-delta/(this.reducedMotion.matches?.45:.65));
     for(const mesh of this.morphMeshes)for(const [name,index] of Object.entries(mesh.morphTargetDictionary)) {
@@ -469,6 +492,7 @@ class GroupPortrait {
       this.model.rotation.y+=(target-this.model.rotation.y)*(1-Math.exp(-delta/1.4));
     }
     this.controls.update(delta);
+    this.contribution.update(arrival,this.camera,this.reducedMotion.matches);
     this.renderer.render(this.scene,this.camera);
     if(time-this.lastStats>500) {
       this.lastStats=time;
@@ -484,7 +508,7 @@ class GroupPortrait {
     for(const photo of this.photoCache.values())photo.width=photo.height=1;
     this.photoCache.clear();if(this.seedAtlas)this.seedAtlas.width=this.seedAtlas.height=1;cancelAnimationFrame(this.frameId);
     clearTimeout(this.photoRetryTimer);
-    this.arrival.clear();this.fromTexture.dispose();this.arrivalMaskTexture.dispose();
+    this.arrival.clear();this.contribution.dispose();this.fromTexture.dispose();this.arrivalMaskTexture.dispose();
     this.fromAtlas.width=this.fromAtlas.height=this.arrivalMask.width=this.arrivalMask.height=1;
     this.resizeObserver.disconnect();this.controls.dispose();this.texture.dispose();this.clearAtlas();
     this.scene.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});this.renderer.dispose();

@@ -101,3 +101,14 @@ test('dispose during model initialization cancels pending work without reviving 
     await assert.rejects(analyzer.init(), /已关闭/);
   } finally { env.restore(); }
 });
+
+test('eye and eyebrow anchors keep complete local features in image coordinates',()=>{
+ const marks=Array.from({length:478},()=>({x:.5,y:.5}));
+ for(const [i,x,y] of [[33,.2,.3],[133,.4,.3],[263,.8,.3],[362,.6,.3],[159,.3,.27],[145,.3,.34],
+   [386,.7,.27],[374,.7,.34],[70,.21,.2],[105,.3,.18],[107,.39,.21],[300,.79,.2],[334,.7,.18],[336,.61,.21]])marks[i]={x,y};
+ const a=alignmentAnchors(marks);
+ assert.deepEqual(a.left_eye_outer,[.2,.3]);assert.deepEqual(a.left_eye_inner,[.4,.3]);
+ assert.deepEqual(a.right_eye_outer,[.8,.3]);assert.deepEqual(a.right_eye_inner,[.6,.3]);
+ assert.deepEqual(a.left_eye_upper,[.3,.27]);assert.deepEqual(a.right_eye_lower,[.7,.34]);
+ assert.deepEqual(a.left_brow_middle,[.3,.18]);assert.deepEqual(a.right_brow_outer,[.79,.2]);
+});

@@ -249,3 +249,23 @@ input::file-selector-button:hover { background: #282b32; }
 .portrait-arrival-note span { display: block; font-size: 11px; line-height: 1.8; letter-spacing: .06em; color: #c8b693; }
 .portrait-arrival-note strong { display: block; font-size: 13px; font-weight: 400; line-height: 1.8; color: #e8e5df; }
 @media(max-width:560px) { .portrait-arrival-note { top: 16px; left: 18px; } }
+
+/* The live photo fragment itself is drawn by the face renderer; no duplicate
+   photo URL or data URL is written into these annotations. */
+.portrait-piece-card {position:absolute;top:22px;left:24px;width:166px;padding:12px;border:1px solid #6b615155;border-radius:3px;z-index:2;pointer-events:none;color:#d2c4aa;background:transparent;}
+.portrait-piece-card>span{font-size:11px;letter-spacing:.08em;display:block;line-height:1.6;}
+.portrait-piece-image{height:116px;margin:10px 0;}
+.portrait-piece-card strong{font-size:11px;line-height:1.6;font-weight:400;color:#a4a4a7;display:block;}
+.portrait-piece-guide{position:absolute;inset:0;width:100%;height:100%;z-index:1;overflow:visible;pointer-events:none;}
+.portrait-piece-guide path{fill:none;stroke:#baa987;stroke-width:.8;stroke-dasharray:3 6;}
+.portrait-piece-guide circle{fill:#d6c8a8;stroke:#18191d;stroke-width:1;}
+.portrait-arrival-note{left:auto;right:24px;text-align:right;max-width:calc(100% - 240px);}
+.portrait-show-piece{margin-top:16px;display:flex;gap:18px;align-items:center;justify-content:space-between;grid-column:1;}
+@media(max-width:560px){
+ .portrait-piece-card{top:12px;left:12px;width:105px;padding:9px;}
+ .portrait-piece-card>span,.portrait-piece-card strong{font-size:9px;}
+ .portrait-piece-image{height:70px;margin:6px 0;}
+ .portrait-arrival-note{right:14px;max-width:calc(100% - 155px);}
+ .portrait-arrival-note span{font-size:10px;}.portrait-arrival-note strong{font-size:11px;}
+ .portrait-show-piece{font-size:11px;gap:8px;padding:8px 10px;}
+}

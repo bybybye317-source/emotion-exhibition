@@ -113,6 +113,48 @@ export function voronoiCells(seeds = PATCH_SEEDS) {
   });
 }
 
+/**
+ * A gently curved version of the fixed partition, without changing ownership.
+ * Build every shared edge once in canonical direction: neighbouring masks use
+ * precisely the same points in reverse, so the bends cannot open hairline gaps.
+ * A static, low-amplitude field moves only mask edges, never facial landmarks.
+ */
+export function organicFragmentCells(seeds = PATCH_SEEDS) {
+  const precision=1e12;
+  const canonical=point=>point.map(value=>Math.round(Math.max(0,Math.min(1,value))*precision)/precision);
+  const key=point=>point.join(',');
+  const curves=new Map();
+  const bend=([x,y])=>{
+    if(x===0||x===1||y===0||y===1)return [x,y];
+    // The outer frame stays fixed. The vector displacement is at most 3.6 px
+    // in a 1024 px atlas; low spatial frequency keeps the field orientation.
+    const amplitude=(3.6/1024/Math.SQRT2)*16*x*(1-x)*y*(1-y);
+    return [x+amplitude*Math.sin(2*Math.PI*(2.1*x+.8*y)+.35),
+      y+amplitude*Math.sin(2*Math.PI*(.6*x+2.3*y)+1.2)];
+  };
+  return voronoiCells(seeds).map(cell=>{
+    const vertices=cell.map(canonical).filter((point,i,all)=>key(point)!==key(all[(i+all.length-1)%all.length]));
+    const polygon=[];
+    for(let i=0;i<vertices.length;i++) {
+      const a=vertices[i],b=vertices[(i+1)%vertices.length];
+      const forward=key(a)<key(b),start=forward?a:b,end=forward?b:a;
+      const edgeKey=`${key(start)}|${key(end)}`;
+      if(!curves.has(edgeKey)) {
+        const steps=Math.max(1,Math.ceil(Math.hypot(end[0]-start[0],end[1]-start[1])/.012));
+        curves.set(edgeKey,Array.from({length:steps+1},(_,step)=>{
+          const t=step/steps;
+          return bend(step===0?start:step===steps?end:
+            [start[0]+t*(end[0]-start[0]),start[1]+t*(end[1]-start[1])]);
+        }));
+      }
+      const curve=curves.get(edgeKey);
+      const directed=forward?curve:[...curve].reverse();
+      polygon.push(...directed.slice(0,-1).map(point=>point.slice()));
+    }
+    return polygon;
+  });
+}
+
 export function photoTriangle(anchors, width, height) {
   const names=['left_eye','right_eye','mouth'];
   const fallback=[[.31,.38],[.69,.38],[.50,.73]];

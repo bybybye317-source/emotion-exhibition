@@ -1,4 +1,4 @@
-import {affineFromTriangles, photoTriangle, voronoiCells, planPatchAssignments} from './portrait-math.mjs?v=20261027-fragments';
+import {affineFromTriangles, photoTriangle, organicFragmentCells, planPatchAssignments} from './portrait-math.mjs?v=20261027-collage';
 
 const DEFAULT_COLOR = '#aaa69e';
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -155,12 +155,10 @@ function normalizeExposure(output, target) {
   for(let i=0;i<256;i++) {cumulative+=histogram[i];if(cumulative>=count*.85){upper=i;break;}}
   const gain=exposureGain(upper);
   for(let i=0;i<data.length;i+=4) {
-    const luma=.2126*data[i]+.7152*data[i+1]+.0722*data[i+2];
-    // Restrained chroma belongs to the stone palette, while 90% of individual
-    // colour differences remain. Keep highlights from clipping after a lift.
+    // Preserve the person's original skin colour and local texture; only
+    // guard extreme exposure, without pulling all fragments toward grey.
     for(let channel=0;channel<3;channel++) {
-      const colour=luma+(data[i+channel]-luma)*.90;
-      data[i+channel]=clamp(colour*gain,0,255);
+      data[i+channel]=clamp(data[i+channel]*gain,0,255);
     }
   }
   ctx.putImageData(pixels,0,0);
@@ -215,14 +213,14 @@ export function paintCollage(ctx, alignedImages, size=1024, baseColor=DEFAULT_CO
   ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;ctx.filter='none';
   ctx.fillStyle=baseColor;ctx.fillRect(0,0,size,size);
   if(!sources.some(Boolean)){ctx.restore();return;}
-  const cells=voronoiCells().map(cell=>cell.map(([x,y])=>[x*size,y*size]));
+  const cells=organicFragmentCells().map(cell=>cell.map(([x,y])=>[x*size,y*size]));
   // Blurred partition masks still sum to one in the interior. Add their
   // premultiplied colours instead of stacking transparent layers, which would
   // reveal the stone underpaint or leave an order-dependent hard seam.
   ctx.clearRect(0,0,size,size);ctx.globalCompositeOperation='lighter';
   const mask=makeCanvas(size), maskCtx=mask.getContext('2d');
   const layer=makeCanvas(size), layerCtx=layer.getContext('2d');
-  const feather=Math.max(1,10*size/1024);
+  const feather=Math.max(.6,4.5*size/1024);
   cells.forEach((cell,index)=>{
     maskCtx.clearRect(0,0,size,size);maskCtx.filter=`blur(${feather}px)`;
     maskCtx.fillStyle='#fff';polygon(maskCtx,cell);maskCtx.fill();maskCtx.filter='none';

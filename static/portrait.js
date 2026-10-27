@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {createAlignedPhoto, paintCollage} from './portrait-collage.mjs?v=20261027-fragments';
-import {LABELS, morphWeights, normalizeScores} from './portrait-math.mjs?v=20261027-fragments';
+import {createAlignedPhoto, paintCollage} from './portrait-collage.mjs?v=20261027-collage';
+import {LABELS, morphWeights, normalizeScores} from './portrait-math.mjs?v=20261027-collage';
 
 const $ = id => document.getElementById(id);
 const SIZE = 1024;
@@ -123,10 +123,10 @@ class GroupPortrait {
         float iris = 1.0-smoothstep(0.050,0.060,eyeRadius);
         float pupil = 1.0-smoothstep(0.018,0.026,eyeRadius);
         stone *= 1.0 - iris*0.24 - pupil*0.32;
-        diffuseColor.rgb *= mix(stone, photograph, vPortraitWeight * portraitPhotoMix * 0.94);
+        diffuseColor.rgb *= mix(stone, photograph, vPortraitWeight * portraitPhotoMix * 0.98);
       `);
     };
-    material.customProgramCacheKey=()=> 'sculpted-portrait-collage-v3';
+    material.customProgramCacheKey=()=> 'sculpted-portrait-collage-v4';
     return material;
   }
 

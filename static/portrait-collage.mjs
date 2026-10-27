@@ -1,4 +1,4 @@
-import {affineFromTriangles, photoTriangle, voronoiCells} from './portrait-math.mjs';
+import {affineFromTriangles, photoTriangle, voronoiCells, planPatchAssignments} from './portrait-math.mjs?v=20261027-fragments';
 
 const DEFAULT_COLOR = '#aaa69e';
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -203,17 +203,18 @@ export function createAlignedPhoto(image, anchors, {size=1024,bounds,landmarks,b
 }
 
 /**
- * Paint an aligned atlas in place. Null photos are skipped so failed loads do
- * not leave pale holes. Fixed cells keep a participant's fragments stationary;
- * a narrow soft edge joins surfaces without averaging away the whole face.
- * No image data is stored outside the caller-owned canvas.
+ * Paint one region per person over an already assembled seed face. Preserve
+ * null entries in alignedImages: their original slots use their own seed, so
+ * a failed load cannot move another person's fragment. No photo is repeated
+ * across vacant cells or enlarged into the whole face.
  */
-export function paintCollage(ctx, alignedImages, size=1024, baseColor=DEFAULT_COLOR) {
-  const photos=alignedImages.filter(Boolean);
+export function paintCollage(ctx, alignedImages, size=1024, baseColor=DEFAULT_COLOR, {records,seedImages=[]}={}) {
+  const photos=Array.isArray(alignedImages)?alignedImages:[];
+  const assignments=planPatchAssignments(records ?? photos.map((_,index)=>({id:`photo-${index}`})));
+  const sources=assignments.map(({recordIndex,seedIndex})=>(recordIndex===null?null:photos[recordIndex]) || seedImages[seedIndex] || null);
   ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;ctx.filter='none';
   ctx.fillStyle=baseColor;ctx.fillRect(0,0,size,size);
-  if(!photos.length){ctx.restore();return;}
-  if(photos.length===1){ctx.drawImage(photos[0],0,0,size,size);ctx.restore();return;}
+  if(!sources.some(Boolean)){ctx.restore();return;}
   const cells=voronoiCells().map(cell=>cell.map(([x,y])=>[x*size,y*size]));
   // Blurred partition masks still sum to one in the interior. Add their
   // premultiplied colours instead of stacking transparent layers, which would
@@ -226,7 +227,8 @@ export function paintCollage(ctx, alignedImages, size=1024, baseColor=DEFAULT_CO
     maskCtx.clearRect(0,0,size,size);maskCtx.filter=`blur(${feather}px)`;
     maskCtx.fillStyle='#fff';polygon(maskCtx,cell);maskCtx.fill();maskCtx.filter='none';
     layerCtx.globalCompositeOperation='source-over';layerCtx.clearRect(0,0,size,size);
-    layerCtx.drawImage(photos[index%photos.length],0,0,size,size);
+    if(sources[index]) layerCtx.drawImage(sources[index],0,0,size,size);
+    else {layerCtx.fillStyle=baseColor;layerCtx.fillRect(0,0,size,size);}
     layerCtx.globalCompositeOperation='destination-in';layerCtx.drawImage(mask,0,0);
     ctx.drawImage(layer,0,0);
   });

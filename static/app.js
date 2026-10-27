@@ -1,5 +1,5 @@
 import {BrowserEmotionAnalyzer} from './browser-inference.mjs?v=20261027-sculpture';
-import {LocalSession, EMOTION_KEYS} from './session-state.mjs';
+import {LocalSession, EMOTION_KEYS} from './session-state.mjs?v=20261027-fragments';
 
 const $=id=>document.getElementById(id);
 const labels={happiness:'快乐',neutral:'中性',sadness:'悲伤',surprise:'惊讶',anger:'愤怒',fear:'恐惧',disgust:'厌恶',contempt:'轻蔑'};
@@ -93,7 +93,7 @@ async function cameraLoop(generation){
   if(!disposed&&generation===cameraGeneration)loopTimer=setTimeout(()=>cameraLoop(generation),Math.max(40,250-(performance.now()-started)));
 }
 $('start-camera').addEventListener('click',async()=>{
-  if(pending()||stream)return;error();const generation=++cameraGeneration;state.camera={status:'starting'};render();
+  if(pending()||stream)return;error();const generation=++cameraGeneration;state.camera={status:'starting',detail:'请允许浏览器使用摄像头。若一直等待，可检查系统权限或停止后用照片参与。'};render();
   try{
     if(!navigator.mediaDevices?.getUserMedia)throw new Error('当前环境不支持摄像头，请使用 HTTPS 页面或照片参与。');
     const next=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:960},height:{ideal:720}},audio:false});

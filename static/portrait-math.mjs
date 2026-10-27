@@ -43,12 +43,51 @@ export function affineFromTriangles(source, target) {
   return [a,b,c,d,e,f];
 }
 
-// A fixed layout keeps the seams stationary while photographs and poses change.
+// Fixed anatomical regions sit inside the face's visible projection rather
+// than in unused atlas corners. Their borders never move as people arrive.
 export const PATCH_SEEDS = [
-  [.28,.13],[.51,.10],[.73,.14], [.16,.29],[.36,.29],[.62,.28],[.84,.31],
-  [.15,.48],[.34,.46],[.51,.40],[.68,.47],[.86,.49],
-  [.20,.65],[.40,.61],[.59,.62],[.80,.65], [.30,.80],[.51,.76],[.70,.81],[.51,.94],
+  [.32,.16],[.50,.14],[.68,.16],
+  [.23,.34],[.37,.34],[.63,.34],[.77,.34],
+  [.23,.52],[.37,.51],[.50,.50],[.63,.51],[.77,.52],
+  [.25,.68],[.39,.67],[.51,.70],[.63,.67],[.75,.68],
+  [.36,.84],[.51,.86],[.66,.84],
 ];
+
+// Start on a recognisable eye/cheek/forehead, then spread contributions across
+// the face. A new cycle replaces just the oldest contribution's region.
+export const FRAGMENT_SLOT_ORDER = Object.freeze([4,10,1,8,5,14,9,0,16,7,2,13,6,18,3,15,11,17,12,19]);
+
+const validSlotCount = count => Number.isInteger(count) && count > 0 && count <= PATCH_SEEDS.length;
+
+export function fragmentSlot(sequence, slotCount=PATCH_SEEDS.length) {
+  if(!Number.isSafeInteger(sequence) || sequence<0) throw new RangeError('Invalid fragment sequence');
+  if(!validSlotCount(slotCount)) throw new RangeError('Invalid fragment slot count');
+  const order=FRAGMENT_SLOT_ORDER.filter(slot=>slot<slotCount);
+  return order[sequence%slotCount];
+}
+
+/**
+ * Plan one fixed region per participant. Records are oldest first, and a
+ * stored slot survives removal, failed photo loads and arrival of others.
+ * The newest record wins duplicate IDs/slots; unoccupied slots retain seeds.
+ * Index-based slots are only a compatibility path for older session records.
+ */
+export function planPatchAssignments(records=[], slotCount=PATCH_SEEDS.length) {
+  if(!validSlotCount(slotCount)) throw new RangeError('Invalid fragment slot count');
+  const plan=Array.from({length:slotCount},(_,slot)=>({slot,recordIndex:null,participantId:null,seedIndex:slot}));
+  const seen=new Set();
+  for(let index=(Array.isArray(records)?records.length:0)-1;index>=0;index--) {
+    const record=records[index];
+    if(!record || typeof record!=='object') continue;
+    const id=record.id ?? null;
+    if(id!==null && seen.has(id)) continue;
+    if(id!==null) seen.add(id);
+    const slot=record.slot===undefined?fragmentSlot(index,slotCount):record.slot;
+    if(!Number.isInteger(slot) || slot<0 || slot>=slotCount || plan[slot].recordIndex!==null) continue;
+    plan[slot]={slot,recordIndex:index,participantId:id,seedIndex:slot};
+  }
+  return plan;
+}
 
 export function voronoiCells(seeds = PATCH_SEEDS) {
   return seeds.map((seed,index) => {

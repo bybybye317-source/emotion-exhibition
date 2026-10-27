@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {createAlignedPhoto, paintCollage} from './portrait-collage.mjs';
-import {LABELS, morphWeights, normalizeScores} from './portrait-math.mjs';
+import {createAlignedPhoto, paintCollage} from './portrait-collage.mjs?v=20261027-fragments';
+import {LABELS, morphWeights, normalizeScores} from './portrait-math.mjs?v=20261027-fragments';
 
 const $ = id => document.getElementById(id);
 const SIZE = 1024;
 const BASE_COLOR = '#aeb0ae';
+const SEED_URL = new URL('./portrait-seeds/manifest.json', import.meta.url);
+const photoKey = record => JSON.stringify([record.id,record.image_url,record.photo_anchors]);
 const MODEL_URL = new URL('./models/sculpture-head.glb', import.meta.url);
 const clamp01 = value => Math.min(1,Math.max(0,value));
 const smooth = (a,b,x) => {const t=clamp01((x-a)/(b-a));return t*t*(3-2*t);};
@@ -15,6 +17,7 @@ const canvas = () => Object.assign(document.createElement('canvas'), {width:SIZE
 class GroupPortrait {
   constructor(stage) {
     this.stage=stage;this.connected=false;this.records=[];this.scores={};this.preview='group';
+    this.photoCache=new Map();this.seedAtlas=null;this.seedLoading=false;this.seedFailure=null;
     this.generation=0;this.signature=null;this.loadedCount=0;this.loadingPhotos=false;
     this.targetMorphs={};this.morphMeshes=[];this.autoRotate=false;this.ready=false;this.failure=null;
     this.abort=null;this.disposed=false;this.lastFrame=performance.now();this.lastStats=0;this.blend=0;
@@ -30,7 +33,7 @@ class GroupPortrait {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.7));
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;
     this.renderer.toneMapping=THREE.ACESFilmicToneMapping;this.renderer.toneMappingExposure=1.0;
-    this.renderer.domElement.setAttribute('aria-label','由观众照片构成的三维群体脸，可拖动旋转');
+    this.renderer.domElement.setAttribute('aria-label','由不同面孔的小片段拼成的三维群体脸，可拖动旋转');
     this.renderer.domElement.setAttribute('role','img');this.stage.append(this.renderer.domElement);
     this.renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();this.failure='图形显示中断，请刷新页面恢复';this.updateStatus();});
     this.renderer.domElement.addEventListener('webglcontextrestored',()=>location.reload());
@@ -93,7 +96,7 @@ class GroupPortrait {
       this.model=candidate;candidate=null;
       this.scene.add(this.model);this.ready=true;
       this.stage.dataset.model='ready';this.stage.dataset.geometry='sculpted-expression-mask';
-      this.loadPhotos(this.records);this.updateStatus();
+      this.loadSeedPhotos();this.loadPhotos(this.records);this.updateStatus();
     } catch(error) {
       candidate?.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});
       this.morphMeshes=[];this.head=null;
@@ -128,6 +131,7 @@ class GroupPortrait {
   }
 
   bindControls() {
+    $('portrait-retry-seeds').addEventListener('click',()=>this.loadSeedPhotos());
     $('portrait-retry-model').addEventListener('click',()=>this.loadModel());
     $('portrait-reset-view').addEventListener('click',()=>this.resetView());
     $('portrait-rotate').addEventListener('click',()=>{
@@ -175,7 +179,7 @@ class GroupPortrait {
     this.connected=connected;
     this.records=(state.session.participants||[]).slice(-20);
     this.scores=normalizeScores(state.session.group_scores);
-    const signature=JSON.stringify(this.records.map(p=>[p.id,p.image_url,p.photo_anchors]));
+    const signature=JSON.stringify(this.records.map(p=>[p.id,p.slot,p.image_url,p.photo_anchors]));
     if(signature!==this.signature) {
       this.signature=signature;this.photoRetries=0;this.loadPhotos(this.records);
     } else if(reconnected&&!this.loadingPhotos&&this.loadedCount<this.records.length) {
@@ -218,18 +222,78 @@ class GroupPortrait {
 
   updateStatus() {
     $('portrait-count').textContent=`${this.records.length} 位观众`;
-    let status=this.records.length?'表情跟随群体，照片已融入肖像':'等待第一位观众';
-    if(this.loadingPhotos) status='正在将观众照片拼入肖像…';
-    else if(this.loadedCount<this.records.length) status=`已拼入 ${this.loadedCount}/${this.records.length} 张照片；部分照片不可用`;
+    let status=this.records.length?'每个人的一部分，成为共同的脸':'一张已经相遇的脸';
+    let detail=this.seedAtlas?'空位由 20 张 AI 虚构面孔的片段填充，不计入观众或情绪数据。':'初始拼脸正在准备。';
+    if(this.records.length) detail=`${this.loadedCount} 块观众片段 · ${20-this.loadedCount} 块${this.seedAtlas?'示例片段':'待填充区域'}。每次采集只替换一块，其余位置保持不变。`;
+    if(this.loadingPhotos) status='正在将新片段拼入肖像…';
+    else if(this.loadedCount<this.records.length) status=`已拼入 ${this.loadedCount}/${this.records.length} 块；部分照片不可用`;
+    if(this.seedLoading&&!this.records.length)status='正在拼合初始面孔…';
+    if(this.seedFailure)detail='初始素材暂未加载。可以重试，或直接采集观众片段。';
     if(this.preview!=='group') status=`预览：${LABELS[this.preview]} · 不改变采集数据`;
     if(!this.connected) status='正在准备本地体验';
     if(!this.ready) status='正在加载三维人脸…';
     if(this.failure)status=this.failure;
     $('portrait-status').textContent=status;
-    $('portrait-empty-hint').hidden=this.records.length>0;
+    $('portrait-empty-hint').textContent=detail;
+    $('portrait-empty-hint').hidden=false;
+    $('portrait-retry-seeds').hidden=!this.seedFailure;
     this.stage.dataset.participants=String(this.records.length);
     this.stage.dataset.photos=String(this.loadedCount);
+    this.stage.dataset.seeds=this.seedAtlas?'20':'0';
+    this.stage.dataset.seedStatus=this.seedLoading?'loading':this.seedFailure?'error':this.seedAtlas?'ready':'waiting';
     this.stage.dataset.connected=String(this.connected);
+  }
+
+  async loadSeedPhotos() {
+    if(!this.ready||this.disposed||this.seedLoading||this.seedAtlas)return;
+    this.seedLoading=true;this.seedFailure=null;this.updateStatus();
+    this.seedAbort=new AbortController();
+    const timeout=setTimeout(()=>this.seedAbort.abort(),20000);
+    let image=null,assembled=null;
+    const aligned=[];
+    try {
+      const response=await fetch(SEED_URL,{signal:this.seedAbort.signal});
+      if(!response.ok)throw new Error('初始面孔清单不可用');
+      const manifest=await response.json();
+      if(manifest.faces?.length!==20)throw new Error('初始面孔数量不完整');
+      const imageUrl=new URL(manifest.image,SEED_URL);
+      if(imageUrl.origin!==location.origin)throw new Error('初始素材来源无效');
+      const photo=await fetch(imageUrl,{signal:this.seedAbort.signal});
+      if(!photo.ok)throw new Error('初始面孔素材不可用');
+      image=await createImageBitmap(await photo.blob());
+      if(this.disposed)return;
+      for(const face of manifest.faces) {
+        const [x,y,width,height]=face.rect;
+        const tile=Object.assign(document.createElement('canvas'),{width,height});
+        tile.getContext('2d').drawImage(image,x,y,width,height,0,0,width,height);
+        try {aligned.push(createAlignedPhoto(tile,face.photo_anchors,{size:SIZE,...this.projection,baseColor:BASE_COLOR}));}
+        finally {tile.width=tile.height=1;}
+      }
+      assembled=canvas();
+      paintCollage(assembled.getContext('2d'),[],SIZE,BASE_COLOR,{records:[],seedImages:aligned});
+      this.seedAtlas=assembled;assembled=null;
+      this.repaintPhotos();
+    } catch(error) {
+      if(!this.disposed)this.seedFailure=error.message;
+    } finally {
+      clearTimeout(timeout);image?.close();
+      aligned.forEach(photo=>{photo.width=photo.height=1;});
+      if(assembled)assembled.width=assembled.height=1;
+      this.seedLoading=false;
+      if(!this.disposed)this.updateStatus();
+    }
+  }
+
+  repaintPhotos() {
+    if(this.disposed||!this.ready)return;
+    const aligned=this.records.map(record=>this.photoCache.get(photoKey(record))||null);
+    this.loadedCount=aligned.filter(Boolean).length;
+    // A single assembled seed texture keeps the baseline at 4 MB instead of
+    // retaining twenty full-size aligned photographs. Each cell samples only
+    // its own corresponding location from that baseline.
+    const seedImages=this.seedAtlas?Array(20).fill(this.seedAtlas):[];
+    paintCollage(this.atlasContext,aligned,SIZE,BASE_COLOR,{records:this.records,seedImages});
+    this.texture.needsUpdate=true;
   }
 
   async loadPhotos(records) {
@@ -238,13 +302,17 @@ class GroupPortrait {
     clearTimeout(this.photoRetryTimer);
     this.abort?.abort();this.abort=new AbortController();
     const controller=this.abort;
-    this.loadedCount=0;this.loadingPhotos=records.length>0;
-    // Clear immediately: a late response from a previous session must never
-    // paint a deleted participant back onto the head.
-    this.clearAtlas();this.texture.needsUpdate=true;this.photoUniform.value=0;
-    if(!records.length){this.loadingPhotos=false;this.updateStatus();return;}
+    const keys=new Set(records.map(photoKey));
+    // Keep unchanged participants in place while a new fragment loads. Remove
+    // evicted/deleted photos immediately, including their backing pixel stores.
+    for(const [key,photo] of this.photoCache)if(!keys.has(key)) {
+      photo.width=photo.height=1;this.photoCache.delete(key);
+    }
+    const missing=records.filter(record=>!this.photoCache.has(photoKey(record)));
+    this.loadingPhotos=missing.length>0;this.repaintPhotos();this.updateStatus();
+    if(!missing.length)return;
     const timeout=setTimeout(()=>controller.abort(),10000);
-    const results=await Promise.allSettled(records.map(async record=>{
+    const results=await Promise.allSettled(missing.map(async record=>{
       const url=new URL(record.image_url,location.origin);
       if(url.protocol!=='blob:' || url.origin!==location.origin)throw new Error('仅接受本浏览器生成的照片');
       const response=await fetch(url,{signal:controller.signal,cache:'no-store'});
@@ -254,12 +322,15 @@ class GroupPortrait {
     clearTimeout(timeout);
     const images=results.map(result=>result.status==='fulfilled'?result.value:null);
     if(this.disposed||generation!==this.generation){images.forEach(image=>image?.close());return;}
-    const aligned=images.map((image,i)=>image?createAlignedPhoto(image,records[i].photo_anchors,{size:SIZE,...this.projection,baseColor:BASE_COLOR}):null);
-    this.loadedCount=images.filter(Boolean).length;
-    paintCollage(this.atlasContext,aligned,SIZE,BASE_COLOR);
-    aligned.forEach(photo=>{if(photo)photo.width=photo.height=1;});
-    images.forEach(image=>image?.close());
-    this.texture.needsUpdate=true;this.loadingPhotos=false;this.updateStatus();
+    for(const [i,image] of images.entries()) {
+      if(!image)continue;
+      try {
+        const aligned=createAlignedPhoto(image,missing[i].photo_anchors,{size:SIZE,...this.projection,baseColor:BASE_COLOR});
+        this.photoCache.set(photoKey(missing[i]),aligned);
+      } catch { /* Only this participant falls back to its seed fragment. */ }
+      finally {image.close();}
+    }
+    this.repaintPhotos();this.loadingPhotos=false;this.updateStatus();
     if(this.loadedCount<records.length && (this.photoRetries||0)<2) {
       this.photoRetries=(this.photoRetries||0)+1;
       this.photoRetryTimer=setTimeout(()=>{
@@ -279,7 +350,7 @@ class GroupPortrait {
       mesh.morphTargetInfluences[index]+=step;
     }
     if(this.head) this.stage.dataset.jawOpen=(this.head.morphTargetInfluences[this.head.morphTargetDictionary.jawOpen]||0).toFixed(3);
-    this.photoUniform.value+=((this.loadedCount?1:0)-this.photoUniform.value)*alpha;
+    this.photoUniform.value+=((this.loadedCount||this.seedAtlas?1:0)-this.photoUniform.value)*alpha;
     // A gentle oscillation keeps the open sculptural mask facing the viewer.
     this.controls.autoRotate=false;
     if(this.model) {
@@ -298,7 +369,9 @@ class GroupPortrait {
   }
 
   dispose() {
-    this.disposed=true;++this.generation;this.abort?.abort();cancelAnimationFrame(this.frameId);
+    this.disposed=true;++this.generation;this.abort?.abort();this.seedAbort?.abort();
+    for(const photo of this.photoCache.values())photo.width=photo.height=1;
+    this.photoCache.clear();if(this.seedAtlas)this.seedAtlas.width=this.seedAtlas.height=1;cancelAnimationFrame(this.frameId);
     clearTimeout(this.photoRetryTimer);
     this.resizeObserver.disconnect();this.controls.dispose();this.texture.dispose();this.clearAtlas();
     this.scene.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});this.renderer.dispose();

@@ -11,8 +11,8 @@
   <link rel="stylesheet" href="./static/style.css?v=20261027-emotions">
   <link rel="stylesheet" href="./static/gallery-theme.css?v=20261027-gallery">
   <script type="importmap">{"imports":{"three":"./static/vendor/three/three.module.js","three/addons/":"./static/vendor/three/addons/"}}</script>
-  <script type="module" src="./static/app.js?v=20261027-sculpture"></script>
-  <script type="module" src="./static/portrait.js?v=20261027-sculpture"></script>
+  <script type="module" src="./static/app.js?v=20261027-fragments"></script>
+  <script type="module" src="./static/portrait.js?v=20261027-fragments"></script>
   <script type="module" src="./static/music.js?v=20261027-breath"></script>
   <script type="module" src="./static/scent.js"></script>
 </head>
@@ -133,9 +133,10 @@
         </div>
         <aside class="portrait-rail" aria-label="作品状态">
           <p id="portrait-count" class="portrait-count">0 位观众</p>
-          <h3 id="portrait-status" class="portrait-status" role="status">等待第一位观众</h3>
+          <h3 id="portrait-status" class="portrait-status" role="status">正在拼合初始面孔…</h3>
           <button id="portrait-retry-model" class="button secondary compact" type="button" hidden>重试三维肖像</button>
-          <p id="portrait-empty-hint" class="portrait-description">完成采集后，照片将拼贴到这张脸上。</p>
+          <button id="portrait-retry-seeds" class="button secondary compact" type="button" hidden>重试初始面孔</button>
+          <p id="portrait-empty-hint" class="portrait-description">20 张虚构面孔，各取一部分，拼成一张共同的脸。每位观众加入时，只替换其中一块。</p>
           <section class="portrait-distribution" aria-labelledby="portrait-emotions-title">
             <h3 id="portrait-emotions-title">群体表情</h3>
             <div id="portrait-emotions" class="scores compact-scores"><p class="portrait-no-data">暂无数据<br><span>当有观众完成采集后，将分析并展示群体的表情倾向。</span></p></div>

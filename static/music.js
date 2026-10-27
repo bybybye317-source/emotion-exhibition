@@ -1,5 +1,6 @@
-import { EmotionMusicEngine } from './music-engine.mjs';
-import { musicParameters, groupDiversity, MUSIC_LAYERS } from './music-math.mjs';
+import { EmotionMusicEngine } from './music-engine.mjs?v=20261027-matter';
+import { musicParameters, groupDiversity } from './music-math.mjs';
+import { connectMusicVisual } from './music-visual-controller.mjs';
 
 const $ = id => document.getElementById(id);
 const labels = { happiness: '快乐', neutral: '中性', sadness: '悲伤', surprise: '惊讶', anger: '愤怒', fear: '恐惧', disgust: '厌恶', contempt: '轻蔑' };
@@ -16,6 +17,8 @@ let errorMessage = '';
 let disposed = false;
 let target = musicParameters({}, { idle: true });
 let source = '等待观众 · 待机声景';
+let visualScores = null;
+let visualController = null;
 
 function text(id, value) {
   if ($(id).textContent !== value) $(id).textContent = value;
@@ -45,10 +48,7 @@ function render() {
   for (const name of ['texture', 'drift', 'space']) {
     text(`music-${name}-value`, `${Math.round((playingParameters[name] ?? 0) * 100)}%`);
   }
-  for (const name of MUSIC_LAYERS) {
-    const value = playing ? Math.max(0, Math.min(1, audio.levels?.[name] ?? playingParameters[name] ?? 0)) : 0;
-    $( `music-${name}-fill`).style.width = `${Math.round(value * 100)}%`;
-  }
+  visualController?.refresh();
   const panel = $('music-toggle').closest('section');
   if (panel) {
     panel.dataset.playing = String(playing);
@@ -61,9 +61,11 @@ function updateTarget() {
   if (disposed) return;
   const participants = session?.participants || [];
   if (preview !== 'group') {
+    visualScores = { [preview]: 1 };
     target = musicParameters({ [preview]: 1 });
     source = `联动预览 · ${labels[preview]} · 不写入观众记录`;
   } else {
+    visualScores = participants.length ? session?.group_scores || null : null;
     const idle = !connected || !participants.length || Date.now() - lastParticipation >= idleAfter;
     target = musicParameters(session?.group_scores || {}, { idle, diversity: idle ? 0 : groupDiversity(participants) });
     source = !connected ? '连接中断 · 待机声景' : !participants.length ? '等待观众 · 待机声景' : idle ? '两分钟无人新增 · 待机声景' : `跟随群体 · ${participants.length} 位观众 · ${labels[target.dominant] || '混合表情'}`;
@@ -154,8 +156,10 @@ window.addEventListener('pagehide', event => {
     return;
   }
   disposed = true;
+  visualController?.dispose();
   window.clearInterval(timer);
   window.removeEventListener('emotion:state', acceptState);
   engine.dispose();
 });
+visualController = connectMusicVisual({engine, getState: () => ({scores: visualScores, parameters: target, preview: preview !== 'group'})});
 updateTarget();

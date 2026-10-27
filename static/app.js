@@ -139,7 +139,9 @@ $('add-image').addEventListener('click',()=>{
   if(!testedImage)return;session.add({scores:testedImage.scores,photoUrl:URL.createObjectURL(testedImage.blob),anchors:testedImage.anchors});testedImage=null;$('image-test-detail').textContent='已加入当前群体作品，可以继续添加下一位。';state.capture={status:'completed',progress:1,detail:'照片已加入作品，视觉、音乐与气味目标已同步。'};render();
 });
 const views=['portrait','music','scent','capture'];const viewTitles={portrait:'群体肖像',music:'群体声景',scent:'群体气味',capture:'参与作品'};
-function selectView(name,focus=false){if(!views.includes(name))name='portrait';for(const view of views){const active=name===view;const tab=$(`nav-${view}`);tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;$(`${view}-panel`).hidden=!active;if(active&&focus)tab.focus();}$('page-title').textContent=viewTitles[name];document.title=`${viewTitles[name]} · 机器如何理解人类的情绪`;window.dispatchEvent(new Event('resize'));}
+function selectView(name,focus=false){if(!views.includes(name))name='portrait';for(const view of views){const active=name===view;const tab=$(`nav-${view}`);tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;$(`${view}-panel`).hidden=!active;if(active&&focus)tab.focus();}$('page-title').textContent=viewTitles[name];document.title=`${viewTitles[name]} · 机器如何理解人类的情绪`;window.dispatchEvent(new Event('resize'));if(location.hash!==`#${name}-panel`)history.replaceState(null,'',`#${name}-panel`);}
+function selectHashView(){const name=location.hash.replace(/^#/, '').replace(/-panel$/, '');selectView(views.includes(name)?name:'portrait');}
+window.addEventListener('hashchange',selectHashView);
 for(const [i,name] of views.entries()){
   $(`nav-${name}`).addEventListener('click',()=>selectView(name));
   $(`nav-${name}`).addEventListener('keydown',event=>{let next;if(event.key==='ArrowRight')next=views[(i+1)%views.length];if(event.key==='ArrowLeft')next=views[(i+views.length-1)%views.length];if(event.key==='Home')next=views[0];if(event.key==='End')next=views.at(-1);if(next){event.preventDefault();selectView(next,true);}});
@@ -149,4 +151,4 @@ window.addEventListener('emotion:state-request',emit);
 const tick=setInterval(()=>{if(captureRun){state.capture.progress=Math.min(1,(performance.now()-captureRun.started)/3000);render();}},100);
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&(stream||state.camera.status==='starting'))stopCamera('页面离开前台，摄像头和本次采集已停止。');});
 window.addEventListener('pagehide',event=>{stopCamera();if(event.persisted)return;disposed=true;clearInterval(tick);session.reset();clearTest();analyzer.dispose?.();});
-selectView('portrait');render();
+selectHashView();render();

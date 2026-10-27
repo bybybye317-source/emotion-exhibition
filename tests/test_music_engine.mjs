@@ -17,8 +17,9 @@ class Node {
   constructor() {
     for (const name of ['gain', 'frequency', 'detune', 'playbackRate', 'pan', 'delayTime', 'Q', 'threshold', 'knee', 'ratio', 'attack', 'release']) this[name] = new Parameter();
     this.disconnected = false;
+    this.connections = [];
   }
-  connect() {}
+  connect(target, output = 0, input = 0) { this.connections.push({target, output, input}); }
   disconnect() { this.disconnected = true; }
   setPeriodicWave(wave) { this.wave = wave; }
   start(time, offset) { this.started = time; this.offset = offset; }
@@ -30,6 +31,13 @@ class FakeContext {
   createDynamicsCompressor() { return this.node(); }
   createGain() { return this.node(); }
   createWaveShaper() { return this.node(); }
+  createChannelSplitter() { const node = this.node(); node.kind = 'splitter'; return node; }
+  createAnalyser() {
+    const node = this.node(); node.kind = 'analyser'; node.sample = 0; node.frequencyBins = [];
+    node.getFloatTimeDomainData = output => output.fill(node.sample);
+    node.getFloatFrequencyData = output => { output.fill(-Infinity); for (const [bin, value] of node.frequencyBins) output[bin] = value; };
+    return node;
+  }
   createConvolver() { return this.node(); }
   createDelay() { return this.node(); }
   createBiquadFilter() { return this.node(); }
@@ -336,4 +344,49 @@ test('dispose during sample loading cancels playback without reconnecting a fini
     assert.equal(engine.getStatus().sampleCount, 0); assert.equal(engine.getStatus().activeVoices, 0);
     assert.equal(engine._timer, null); assert.ok(engine._context.nodes.every(node => node.disconnected));
   } finally { release(); await engine.dispose(); globalThis.AudioContext = previous; }
+});
+
+test('visual analysis taps the actual stereo output and post-gain layers without feeding the mix', async () => {
+  const previous = globalThis.AudioContext; globalThis.AudioContext = FakeContext;
+  const engine = new EmotionMusicEngine();
+  const zero = frame => {
+    assert.equal(frame.rms, 0); assert.equal(frame.peak, 0);
+    for (const key of ['bass', 'mid', 'treble', 'flux']) assert.equal(frame[key], 0);
+    assert.ok(Object.values(frame.layers).every(value => value === 0));
+  };
+  try {
+    zero(engine.getVisualAnalysis()); assert.equal(engine._context, null);
+    engine.setTarget(musicParameters({anger: 1})); zero(engine.getVisualAnalysis());
+    await engine.start();
+    const context = engine._context;
+    assert.equal(context.nodes.filter(node => node.kind === 'analyser').length, 14);
+    const taps = context.nodes.filter(node => node.kind === 'splitter');
+    assert.equal(taps.length, 7);
+    const sources = context.nodes.filter(node => node.connections.some(edge => taps.includes(edge.target)));
+    assert.equal(sources.length, 7);
+    const output = sources.find(node => node.curve instanceof Float32Array);
+    assert.ok(output, 'final wave-shaper output is observed after master and limiters');
+    assert.ok(output.connections.some(edge => edge.target === context.destination), 'existing direct output remains intact');
+    assert.ok(context.nodes.filter(node => node.kind === 'analyser').every(node => node.connections.length === 0), 'analysis never adds an audible destination path');
+    assert.ok(taps.every(node => node.connections[0].output === 0 && node.connections[1].output === 1));
+    const meters = context.nodes.filter(node => node.kind === 'analyser');
+    meters[0].sample = .1; meters[1].sample = -.1;
+    for (let i = 2; i < meters.length; i++) meters[i].sample = i % 2 ? -.03 : .03;
+    context.currentTime = .1;
+    const frame = engine.getVisualAnalysis();
+    assert.equal(frame.playing, true);
+    assert.ok(Math.abs(frame.rms - .1) < 1e-7, 'opposite-phase stereo must not cancel');
+    assert.ok(Math.abs(frame.peak - .1) < 1e-7);
+    assert.ok(Object.values(frame.layers).every(value => Math.abs(value - .03) < 1e-7));
+    assert.equal(engine.getVisualAnalysis(), frame, 'frame is reused without per-frame allocation');
+    engine.setVolume(0); zero(engine.getVisualAnalysis()); assert.equal(frame.playing, true);
+    engine.setVolume(.5); context.currentTime += .1;
+    assert.ok(engine.getVisualAnalysis().rms > 0, 'unmuting reads live output rather than gain targets');
+    const pause = engine.pause(); zero(engine.getVisualAnalysis()); await pause;
+    assert.equal(frame.playing, false);
+    const oldMeters = [...meters]; await engine.start();
+    zero(engine.getVisualAnalysis());
+    assert.ok(oldMeters.every(node => node.disconnected));
+    await engine.dispose(); zero(engine.getVisualAnalysis()); assert.equal(engine.getVisualAnalysis().playing, false);
+  } finally { await engine.dispose(); globalThis.AudioContext = previous; }
 });

@@ -6,11 +6,11 @@
   <meta name="color-scheme" content="light">
   <meta name="description" content="机器如何理解人类的情绪：视觉、听觉与嗅觉模拟，三种感官随群体表情变化。可在浏览器内体验，照片不上传。">
   <title>群体肖像 · 机器如何理解人类的情绪</title>
-  <link rel="stylesheet" href="./static/style.css">
+  <link rel="stylesheet" href="./static/style.css?v=20261027-matter">
   <script type="importmap">{"imports":{"three":"./static/vendor/three/three.module.js","three/addons/":"./static/vendor/three/addons/"}}</script>
-  <script type="module" src="./static/app.js"></script>
+  <script type="module" src="./static/app.js?v=20261027-matter"></script>
   <script type="module" src="./static/portrait.js"></script>
-  <script type="module" src="./static/music.js"></script>
+  <script type="module" src="./static/music.js?v=20261027-matter"></script>
   <script type="module" src="./static/scent.js"></script>
 </head>
 <body>
@@ -65,13 +65,25 @@
     <div id="action-error" class="message error" role="alert" hidden></div>
 
     <section id="music-panel" class="music-panel" role="tabpanel" aria-labelledby="nav-music" hidden>
+      <div id="music-visual-stage" class="music-visual-stage">
+        <canvas id="music-visual-canvas" role="img" aria-label="随真实音乐和群体情绪变化的悬浮薄膜" aria-describedby="music-visual-description"></canvas>
+        <div class="music-visual-heading"><span>MATTER IN SUSPENSION</span><h2>悬浮声场</h2></div>
+        <div id="music-visual-fallback" class="music-visual-fallback" role="status" hidden>当前浏览器无法显示动态画面，音乐仍可正常播放。</div>
+        <div class="music-visual-toolbar">
+          <div class="music-visual-caption"><p id="music-visual-status" role="status">开启声音，唤醒形变</p><p id="music-visual-description">低频推动体积 · 中频牵动褶皱 · 高频点亮微光</p></div>
+          <div class="music-visual-actions">
+            <button id="music-visual-freeze" class="button compact" type="button" aria-pressed="false">暂停画面</button>
+            <button id="music-visual-fullscreen" class="button compact" type="button"><svg class="icon" aria-hidden="true"><use href="#icon-fullscreen"></use></svg><span>全屏</span></button>
+          </div>
+        </div>
+      </div>
       <div class="music-main">
         <div class="music-identity">
           <div class="music-heading"><h2 id="music-title">群体声景</h2><span id="music-status" class="music-status" role="status">尚未开启</span></div>
           <p id="music-source" class="music-source">等待观众 · 待机声景</p>
           <p class="music-character"><span id="music-sample-status">本地管弦采样 · 点击后载入</span><span>力度 <output id="music-dynamics-value">—</output></span><span>厚度 <output id="music-orchestration-value">—</output></span></p>
         </div>
-        <div class="music-layers" aria-label="六个声部的配比">
+        <div class="music-layers" aria-label="六个声部的实时声音强度">
           <div class="music-layer"><span>弦乐</span><div class="music-layer-track"><span id="music-strings-fill" class="music-layer-fill"></span></div></div>
           <div class="music-layer"><span>铜管</span><div class="music-layer-track"><span id="music-brass-fill" class="music-layer-fill"></span></div></div>
           <div class="music-layer"><span>合成器</span><div class="music-layer-track"><span id="music-synth-fill" class="music-layer-fill"></span></div></div>

@@ -44,3 +44,26 @@ select{font:inherit;color:inherit}select:focus-visible,.view-tab:focus-visible{o
 
 /* Public static edition: functional structure, visual direction to follow. */
 .web-intro{margin:0 0 24px;padding:18px 22px;border:1px solid #dce7e7;border-radius:12px;background:#fafcfc}.web-intro>p{margin:0 0 6px;font-size:14px;line-height:1.8;color:#4c6268}.web-intro .web-privacy{font-size:12px;color:#6b7d82}.web-intro .artwork-preview-details{margin-top:12px}.web-intro .artwork-preview-body{padding-bottom:3px}.web-intro .artwork-preview-body label{font-weight:600}.view-tabs{flex-shrink:0}.page-header{flex-wrap:wrap}.page-footer a{color:var(--accent)}.image-test #add-image{margin:12px 0}.scent-panel[role=tabpanel]{margin-top:0}.web-intro .artwork-preview-body p{color:#687b80}@media(max-width:600px){.web-intro{padding:14px 16px}.web-intro>p{font-size:13px}.view-tabs{gap:14px}.page-header .connection{margin-left:auto}.web-intro .web-privacy{font-size:11px}}
+
+/* The auditory artwork has its own dark stage; playback controls stay readable. */
+.music-panel{padding-bottom:18px}
+.music-visual-stage{position:relative;isolation:isolate;background:#07090e;color:#dce0eb;border-radius:8px;overflow:hidden;aspect-ratio:1.85;min-height:360px;max-height:620px;margin-bottom:22px}
+.music-visual-stage canvas{display:block;width:100%;height:100%;position:absolute;inset:0}
+.music-visual-heading{position:absolute;top:26px;left:28px;pointer-events:none}
+.music-visual-heading>span{font-size:10px;letter-spacing:.19em;color:#959cac}
+.music-visual-heading h2{font-size:20px;font-weight:500;letter-spacing:.12em;color:#dce0eb;margin:7px 0 0}
+.music-visual-toolbar{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding:48px 26px 23px;background:linear-gradient(transparent,rgba(7,9,14,.85));pointer-events:none}
+.music-visual-caption{min-width:0}.music-visual-caption p{margin:0;line-height:1.6;font-size:13px;letter-spacing:.04em;color:#d0d5e0}.music-visual-caption p+p{font-size:11px;color:#9ba4b5;margin-top:5px;letter-spacing:.02em}
+.music-visual-actions{display:flex;gap:8px;flex-shrink:0;pointer-events:auto}
+.music-visual-actions .button{color:#d8dfeb;background:#151b27;border-color:#404857;font-weight:500;font-size:11px;min-height:36px}
+.music-visual-actions .button:hover:not(:disabled){background:#263043;border-color:#64738a}
+.music-visual-actions .button[aria-pressed=true]{background:#d6dfec;color:#182130;border-color:#d6dfec}
+.music-visual-fallback{position:absolute;inset:25% 8%;display:grid;place-items:center;text-align:center;color:#c4ccda;font-size:14px;line-height:1.8}
+.music-visual-fallback[hidden]{display:none}
+.music-visual-stage:fullscreen{width:100%;height:100%;aspect-ratio:auto;max-height:none;border-radius:0;margin:0}
+.music-visual-stage:fullscreen .music-visual-toolbar{padding-bottom:max(26px,env(safe-area-inset-bottom))}
+@media(max-width:650px){.music-visual-stage{aspect-ratio:1.1;min-height:320px;margin-bottom:18px}.music-visual-heading{left:19px;top:20px}.music-visual-heading h2{font-size:18px}.music-visual-heading>span{font-size:9px}.music-visual-toolbar{align-items:flex-start;flex-direction:column;padding:42px 17px 17px;gap:12px}.music-visual-caption p{font-size:12px}.music-visual-caption p+p{font-size:10px;max-width:230px;line-height:1.8}.music-visual-actions{align-self:flex-end}.music-visual-actions .button{min-height:40px}.music-visual-stage:fullscreen .music-visual-toolbar{flex-direction:row;align-items:flex-end}}
+@media(prefers-reduced-motion:reduce){.music-visual-stage *{transition:none}}
+.music-visual-stage{width:100%;min-width:0}
+@media(max-width:650px){.music-visual-stage{aspect-ratio:.9;min-height:400px}.music-visual-stage canvas{height:calc(100% - 96px)}.music-visual-stage:fullscreen canvas{height:100%}}
+@media(pointer:coarse){.music-visual-actions .button{min-height:44px}}

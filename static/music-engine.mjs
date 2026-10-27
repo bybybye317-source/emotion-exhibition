@@ -1,5 +1,6 @@
 import {MUSIC_BPM, BAR_SECONDS, MUSIC_LAYERS, musicParameters, sanitizeParameters, planBar, midiFrequency} from './music-math.mjs';
 import {loadOrchestraSamples, selectOrchestraSample} from './music-samples.mjs';
+import {createMusicAnalysis, createVisualFrame, clearVisualFrame} from './music-analysis.mjs';
 
 const MAX_VOICES = 64;
 const LOOKAHEAD = .16;
@@ -146,9 +147,11 @@ function makeGraph(context, parameters, volume, offline = false, samples = null)
     layers[layer] = {input, filter, gain, vibrato};
   }
   const waves = makeWaves(context), noise = makeNoise(context, 3.6);
+  const analysis = offline ? null : createMusicAnalysis(context, safety,
+    Object.fromEntries(MUSIC_LAYERS.map(layer => [layer, layers[layer].gain])), own);
   let previous = parameters;
   return {
-    master, voices,
+    master, voices, analysis,
     setSamples(bank) { samples = bank; },
     update(next, now, immediate = false) {
       if (Math.abs(next.space - previous.space) > .0005) {
@@ -358,6 +361,7 @@ function makeGraph(context, parameters, volume, offline = false, samples = null)
       }
     },
     disconnect() {
+      analysis?.reset();
       this.stopVoices(context.currentTime);
       for (const source of continuousSources) { try { source.stop(context.currentTime); } catch {} }
       for (const node of nodes) node.disconnect();
@@ -373,6 +377,7 @@ export class EmotionMusicEngine {
     this._target = musicParameters(null); this._active = this._target;
     this._volume = .55; this._playing = false; this._disposed = false;
     this._hasPlayed = false;
+    this._emptyVisualFrame = createVisualFrame();
     this._operation = 0; this._plan = []; this._cursor = 0;
     this._plannedBar = -1; this._origin = 0; this._reportedBar = -1;
     this._samples = null; this._sampleLoading = null; this._sampleStatus = 'unloaded';
@@ -386,7 +391,7 @@ export class EmotionMusicEngine {
     this._context = context;
     this._graph = makeGraph(context, this._target, this._volume);
     context.onstatechange = () => {
-      if (context.state !== 'running') { clearInterval(this._timer); this._timer = null; }
+      if (context.state !== 'running') { clearInterval(this._timer); this._timer = null; this._graph?.analysis?.reset(); }
       if (context.state === 'running' && this._playing && !this._timer) this._beginTimer();
       this._emit();
     };
@@ -453,6 +458,7 @@ export class EmotionMusicEngine {
   async pause() {
     const operation = ++this._operation;
     this._playing = false;
+    this._graph?.analysis?.reset();
     clearInterval(this._timer); this._timer = null;
     const context = this._context;
     if (!context || this._disposed) return this.getStatus();
@@ -478,6 +484,7 @@ export class EmotionMusicEngine {
     const volume = limit(value);
     if (volume === this._volume || this._disposed) return;
     this._volume = volume;
+    if (!volume) this._graph?.analysis?.reset(this._playing && this._context?.state === 'running');
     if (this._graph && this._playing) smooth(this._graph.master.gain, volume * OUTPUT_GAIN, this._context.currentTime, .12);
     this._emit();
   }
@@ -508,6 +515,14 @@ export class EmotionMusicEngine {
       else break;
     }
     if (currentBar !== this._reportedBar) { this._reportedBar = currentBar; this._emit(); }
+  }
+  // The returned frame is reused. Copy it only when retaining a measurement.
+  getVisualAnalysis() {
+    const playing = !this._disposed && this._playing && this._context?.state === 'running';
+    if (!playing || !this._volume) {
+      return this._graph?.analysis?.reset(playing) || clearVisualFrame(this._emptyVisualFrame, playing);
+    }
+    return this._graph?.analysis?.read() || clearVisualFrame(this._emptyVisualFrame, playing);
   }
   getStatus() {
     const contextState = this._disposed ? 'closed' : this._context?.state || 'not-started';

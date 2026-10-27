@@ -1,10 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {ScentSimulator, SimulationDriver} from '../static/scent-engine.mjs';
-import {CHANNELS, EMOTIONS, normalizeRecipe, recipeForScores} from '../static/scent-math.mjs';
+import {CHANNELS, EMOTIONS, PHASE_DURATIONS, normalizeRecipe, recipeForScores} from '../static/scent-math.mjs';
 
 const happy = () => recipeForScores({happiness: 1});
 const sad = () => recipeForScores({sadness: 1});
+const D = PHASE_DURATIONS;
+const RELEASE_AT = D.mixing;
+const PURGE_AT = RELEASE_AT + D.releasing;
+const WAIT_AT = PURGE_AT + D.purging;
+const CYCLE = WAIT_AT + D.waiting;
+const INTO_RELEASE = RELEASE_AT + 1000;
+const INTO_PURGE = PURGE_AT + 1000;
 const zeros = Object.fromEntries(CHANNELS.map(({key}) => [key, 0]));
 function setup() {
   let now = 0;
@@ -30,35 +37,36 @@ test('simulator remains stopped until explicitly started; start without data onl
   assert.equal(engine.snapshot().cycles, 1);
 });
 
-test('default 22-second cycle follows prepare/release/purge/wait with output only during release', () => {
+test('default 29-second cycle follows prepare/release/purge/wait with output only during release', () => {
   const {engine, driver, advance} = setup();
   engine.setTarget(happy()); engine.start();
-  assert.deepEqual(advance(2999).outputs, zeros);
-  const release = advance(3000);
+  assert.equal(CYCLE, 29000);
+  assert.deepEqual(advance(RELEASE_AT - 1).outputs, zeros);
+  const release = advance(RELEASE_AT);
   assert.equal(release.phase, 'releasing');
-  assert.equal(release.remaining, 6);
+  assert.equal(release.remaining, D.releasing / 1000);
   assert.deepEqual(release.outputs, happy().percentages);
   assert.deepEqual(driver.outputs, release.outputs);
   assert.equal(driver.purge, 0);
-  const midway = advance(6000);
-  assert.equal(midway.progress, .5); assert.equal(midway.remaining, 3);
-  const purge = advance(9000);
+  const midway = advance(RELEASE_AT + D.releasing / 2);
+  assert.equal(midway.progress, .5); assert.equal(midway.remaining, D.releasing / 2000);
+  const purge = advance(PURGE_AT);
   assert.equal(purge.phase, 'purging'); assert.equal(purge.purge, 1);
   assert.deepEqual(purge.outputs, zeros); assert.deepEqual(driver.outputs, zeros);
-  const wait = advance(17000);
+  const wait = advance(WAIT_AT);
   assert.equal(wait.phase, 'waiting'); assert.equal(wait.purge, 0);
   assert.deepEqual(wait.outputs, zeros);
-  const next = advance(22000);
+  const next = advance(CYCLE);
   assert.equal(next.phase, 'mixing'); assert.equal(next.cycles, 2);
   assert.deepEqual(next.outputs, zeros);
 });
 
 test('new emotion is smoothed and pending while active recipe stays latched through the whole cycle', () => {
   const {engine, advance} = setup();
-  engine.setTarget(happy()); engine.start(); advance(4000);
+  engine.setTarget(happy()); engine.start(); advance(INTO_RELEASE);
   engine.setTarget(sad());
   assert.equal(engine.snapshot().pending, true);
-  const halfway = advance(8000);
+  const halfway = advance(INTO_RELEASE + 4000);
   assert.deepEqual(halfway.activeRecipe, happy());
   assert.equal(halfway.activeRecipe.emotionWeights.happiness, 1);
   assert.equal(halfway.activeRecipe.contributions.bergamot.sadness, 0);
@@ -69,8 +77,8 @@ test('new emotion is smoothed and pending while active recipe stays latched thro
   assert.deepEqual(halfway.outputs, happy().percentages);
   assert.ok(halfway.smoothedRecipe.percentages.bergamot < happy().percentages.bergamot);
   assert.ok(halfway.smoothedRecipe.percentages.bergamot > sad().percentages.bergamot);
-  assert.deepEqual(advance(21999).activeRecipe, happy());
-  const next = advance(22000);
+  assert.deepEqual(advance(CYCLE - 1).activeRecipe, happy());
+  const next = advance(CYCLE);
   assert.notDeepEqual(next.activeRecipe.percentages, happy().percentages);
   assert.ok(next.activeRecipe.percentages.bergamot < 15);
   assert.equal(Object.values(next.activeRecipe.percentages).reduce((a, b) => a + b), 100);
@@ -83,28 +91,28 @@ test('repeating targets does not restart cycles or slow exponential convergence'
   b.advance(7000);
   assert.deepEqual(a.engine.snapshot().smoothedRecipe, b.engine.snapshot().smoothedRecipe);
   assert.equal(a.engine.snapshot().smoothedRecipe.percentages.bergamot, 15);
-  assert.equal(a.engine.snapshot().phase, 'releasing');
-  assert.equal(a.engine.snapshot().remaining, 2);
+  assert.equal(a.engine.snapshot().phase, 'mixing');
+  assert.equal(a.engine.snapshot().remaining, (D.mixing - 7000) / 1000);
   assert.equal(a.engine.snapshot().cycles, 1);
 });
 
 test('clearing valid input while releasing immediately zeroes output and forgets old active/pending data', () => {
   const {engine, driver, advance} = setup();
-  engine.setTarget(happy()); engine.start(); advance(4000); engine.setTarget(sad());
+  engine.setTarget(happy()); engine.start(); advance(INTO_RELEASE); engine.setTarget(sad());
   const cleared = engine.setTarget(null);
   assert.equal(cleared.phase, 'idle'); assert.equal(cleared.enabled, true);
   assert.equal(cleared.pending, false); assert.equal(cleared.activeRecipe, null);
   assert.equal(cleared.targetRecipe, null); assert.equal(cleared.smoothedRecipe, null);
   assert.deepEqual(cleared.outputs, zeros); assert.deepEqual(driver.outputs, zeros); assert.equal(driver.purge, 0);
-  advance(5000); engine.setTarget(sad());
+  advance(INTO_RELEASE + 1000); engine.setTarget(sad());
   assert.equal(engine.snapshot().phase, 'mixing');
   assert.deepEqual(engine.snapshot().activeRecipe, sad());
 });
 
 test('manual stop persists across new data and keeps the next target available for review', () => {
   const {engine, driver, advance} = setup();
-  engine.setTarget(happy()); engine.start(); advance(4000); engine.stop();
-  engine.setTarget(sad()); advance(22000);
+  engine.setTarget(happy()); engine.start(); advance(INTO_RELEASE); engine.stop();
+  engine.setTarget(sad()); advance(CYCLE);
   const state = engine.snapshot();
   assert.equal(state.enabled, false); assert.equal(state.phase, 'stopped');
   assert.equal(state.activeRecipe, null); assert.deepEqual(state.targetRecipe, sad());
@@ -114,7 +122,7 @@ test('manual stop persists across new data and keeps the next target available f
 
 test('hidden, disconnected and clear stop reasons immediately stop releasing or purging', () => {
   for (const reason of ['hidden', 'disconnected', 'cleared']) {
-    for (const time of [4000, 10000]) {
+    for (const time of [INTO_RELEASE, INTO_PURGE]) {
       const {engine, driver, advance} = setup();
       engine.setTarget(happy()); engine.start(); advance(time);
       const state = engine.stop(reason);
@@ -126,7 +134,7 @@ test('hidden, disconnected and clear stop reasons immediately stop releasing or 
 });
 
 test('timer stalls stop instead of catching up or replaying a missed release', () => {
-  for (const startTime of [1000, 4000]) {
+  for (const startTime of [1000, INTO_RELEASE]) {
     const {engine, driver, advance, time} = setup();
     engine.setTarget(happy()); engine.start(); advance(startTime);
     time(startTime + 10000); const state = engine.tick();
@@ -139,10 +147,10 @@ test('timer stalls stop instead of catching up or replaying a missed release', (
 
 test('incoming data cannot conceal a scheduler stall and backwards clocks fail stopped', () => {
   const {engine, driver, advance, time} = setup();
-  engine.setTarget(happy()); engine.start(); advance(4000);
-  time(10000); engine.setTarget(sad());
+  engine.setTarget(happy()); engine.start(); advance(INTO_RELEASE);
+  time(INTO_RELEASE + 6000); engine.setTarget(sad());
   assert.equal(engine.snapshot().reason, 'heartbeat'); assert.deepEqual(driver.outputs, zeros);
-  engine.start(); time(9999); engine.tick();
+  engine.start(); time(INTO_RELEASE + 5999); engine.tick();
   assert.equal(engine.snapshot().enabled, false);
 });
 
@@ -161,14 +169,14 @@ test('snapshots and input recipes cannot mutate engine state and logs remain bou
   assert.equal(engine.snapshot().activeRecipe.emotionWeights.happiness, 1);
   assert.equal(engine.snapshot().targetRecipe.contributions.bergamot.happiness, 32);
   assert.notEqual(engine.snapshot().logs[0].message, 'changed');
-  advance(66000);
+  advance(CYCLE * 3);
   assert.equal(engine.snapshot().logs.length, 8);
   assert.equal(engine.snapshot().cycles, 4);
 });
 
 test('explicit session clear erases recipe, smoothing, cycle count and prior logs', () => {
   const {engine, driver, advance} = setup();
-  engine.setTarget(happy()); engine.start(); advance(25000);
+  engine.setTarget(happy()); engine.start(); advance(CYCLE + INTO_RELEASE);
   const state = engine.stop('cleared');
   assert.equal(state.targetRecipe, null); assert.equal(state.smoothedRecipe, null);
   assert.equal(state.activeRecipe, null); assert.equal(state.cycles, 0);
@@ -178,7 +186,7 @@ test('explicit session clear erases recipe, smoothing, cycle count and prior log
 
 test('dispose clears outputs and prevents restarting without creating timers or hardware connections', () => {
   const {engine, driver, advance} = setup();
-  engine.setTarget(happy()); engine.start(); advance(4000); engine.dispose();
+  engine.setTarget(happy()); engine.start(); advance(INTO_RELEASE); engine.dispose();
   assert.equal(driver.simulated, true); assert.equal(driver.disposed, true);
   assert.deepEqual(driver.outputs, zeros); assert.equal(driver.purge, 0);
   assert.throws(() => engine.start(), /已经关闭/);

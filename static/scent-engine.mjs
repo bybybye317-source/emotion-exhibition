@@ -1,4 +1,4 @@
-import {CHANNELS, EMOTIONS, SCENT_PROFILES, PHASE_DURATIONS, normalizeRecipe, recipeForScores} from './scent-math.mjs?v=20261027-atelier';
+import {CHANNELS, EMOTIONS, SCENT_PROFILES, PHASE_DURATIONS, normalizeRecipe, recipeForScores} from './scent-math.mjs?v=20261028-flow';
 
 const zeroChannels = () => Object.fromEntries(CHANNELS.map(({key}) => [key, 0]));
 const copy = value => value == null ? null : JSON.parse(JSON.stringify(value));

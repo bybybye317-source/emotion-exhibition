@@ -22,6 +22,7 @@ import * as k from './vendor/anatomy/iso-kit.mjs';
 import * as G from './vendor/anatomy/lathe.mjs';
 import * as A from './vendor/anatomy/audit.mjs';
 import {tubePieces, tubeSvg} from './vendor/anatomy/tube.mjs';
+import {CHANNELS} from '../static/scent-math.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const W = 1040, H = 570;
@@ -30,13 +31,15 @@ const P = k.fitProjection([...k.boxCorners(BASE,-20,0), [0,20,197]], W,H,{pad:45
 const at = p => k.iso(p,P), S=(d,o={})=>k.solidSvg(d,{tone:'mid',...o}), L=(d,o={})=>k.lineSvg(d,o);
 const R=A.recorder(P);
 const defs=[];
-const channels=[
- ['bergamot','佛手柑','#c8b77c',-238,35],['neroli','橙花','#cdb99a',-185,17],
- ['lavender','薰衣草','#a39cbf',-132,-1],['greenleaf','绿叶','#91a28d',-79,-19],
- ['cedar','雪松','#b99c80',79,-19],['vetiver','岩兰草','#9ba181',132,-1],
- ['frankincense','乳香','#b8ada3',185,17],['pepper','黑胡椒','#a68f9a',238,35]
-].map(([key,label,color,x,routeY])=>({key,label,color,x,y:-65,routeY}));
+const placements=[[-238,35,135],[-185,17,165],[-132,-1,195],[-79,-19,225],
+ [79,-19,315],[132,-1,345],[185,17,15],[238,35,45]];
+// Label and color have a single authored source, shared with recipe explanations.
+const channels=CHANNELS.map(({key,label,color},index)=>{
+ const [x,routeY,inletAngle]=placements[index];
+ return {key,label,color,x,y:-65,routeY,inletAngle};
+});
 const metadata={width:W,height:H,channels:{},chamber:null};
+const flowDistances=new Map();
 let solidCount=0;
 
 function put(name, center, svg, shape, extra={}) {
@@ -61,17 +64,29 @@ function pipe(name,control,r,{key=null,className='',tone='mid'}={}){
   R.route(name,route,r);
   const chunks=tubePieces(route,r,P,{maxLength:24,caps:true});
   chunks.forEach((chunk,index)=>{
-    const path=k.pathOf(chunk.points.map(at));
-    const flow=key?`<path class="si-flow" data-flow="${key}" d="${path}" pathLength="100"/>`:'';
+    // pathOf writes one decimal place. Measure that same polyline, so rendered
+    // SVG length and phase offsets agree at every depth-sorted chunk boundary.
+    const points=chunk.points.map(at).map(p=>p.map(v=>Math.round(v*10)/10));
+    const path=k.pathOf(points);
+    const length=points.reduce((sum,p,i)=>i?sum+Math.hypot(p[0]-points[i-1][0],p[1]-points[i-1][1]):sum,0);
+    const distance=flowDistances.get(key)||0;
+    const color=channels.find(channel=>channel.key===key)?.color||'#aec6c9';
+    const measures=`data-flow-distance="${distance.toFixed(4)}" data-flow-length="${length.toFixed(4)}"`;
+    const flow=key?`<path class="si-flow-track" data-flow-track="${key}" ${measures} d="${path}" fill="none" stroke="${color}" opacity="0"/><path class="si-flow" data-flow="${key}" ${measures} d="${path}" stroke="${color}"/>`:'';
+    if(key) flowDistances.set(key,distance+length);
     R.put({name:`${name}:${index}`,piece:name,at:chunk.mid,route:name,chunk:index,shapes:[A.tube(chunk.points,chunk.radii)],svg:`<g class="si-pipe ${className}"${key?` data-channel-pipe="${key}"`:''}>${tubeSvg(chunk,{tone})}${flow}</g>`});
   });
+  if(key&&metadata.channels[key]) metadata.channels[key].flowLength=flowDistances.get(key);
+  if(key==='purge') metadata.purge={flowLength:flowDistances.get(key)};
   return route;
 }
 function glass(name,x,y,r,z0,z1,key=null){
  const paths=k.cylinder(x,y,r,z0,z1-z0,P,72);
  const top=at([x,y,z1]),bottom=at([x,y,z0]);
  const radius=k.cameraOf(P).k*r, ry=radius*k.cameraOf(P).sinE;
- const innerClip=`<clipPath id="si-clip-${name}"><path d="${paths.fill}"/></clipPath>`;
+ const fluidRadius=key?r:r-1.2;
+ const interior=key?paths:k.cylinder(x,y,fluidRadius,z0,z1-z0,P,72);
+ const innerClip=`<clipPath id="si-clip-${name}"><path d="${interior.fill}"/></clipPath>`;
  defs.push(innerClip);
  const ticks=Array.from({length:11},(_,i)=>{
    const p0=at([x+r*0.75,y+r*0.6614,z0+(z1-z0)*i/10]);
@@ -83,6 +98,24 @@ function glass(name,x,y,r,z0,z1,key=null){
    inner=`<g clip-path="url(#si-clip-${name})"><path data-liquid="${key}" class="si-liquid" d="" fill="currentColor"/><ellipse data-meniscus="${key}" cx="${bottom[0]}" cy="${bottom[1]}" rx="${radius}" ry="${ry}" fill="currentColor" class="si-meniscus"/></g>`;
    metadata.channels[key]={x:bottom[0],bottom:bottom[1],top:top[1],rx:radius,ry,fillHeight:bottom[1]-top[1]};
  } else {
+   const fluidRx=k.cameraOf(P).k*fluidRadius,fluidRy=fluidRx*k.cameraOf(P).sinE;
+   const inletPoints={};
+   const inlets=channels.map(channel=>{
+     // The manifold feeds hidden passages in the bottom flange. Each visible
+     // stream starts flush on that floor, never at a floating point in glass.
+     const angle=channel.inletAngle*Math.PI/180;
+     const ix=x+Math.cos(angle)*fluidRadius*.62;
+     const iy=y+Math.sin(angle)*fluidRadius*.62;
+     const point=at([ix,iy,z0]);
+     const tip=at([ix,iy,z0+8]);
+     inletPoints[channel.key]={x:point[0],y:point[1],tipX:tip[0],tipY:tip[1]};
+     return `<path class="si-chamber-inlet" data-chamber-inlet="${channel.key}" d="${k.pathOf([point,tip])}" fill="none" stroke="${channel.color}" opacity="0"/>`;
+   }).join('');
+   const clouds=channels.map(channel=>{
+     const point=inletPoints[channel.key];
+     return `<ellipse class="si-chamber-cloud" data-chamber-cloud="${channel.key}" cx="${point.x}" cy="${point.y}" rx="0" ry="0" fill="${channel.color}" opacity="0"/>`;
+   }).join('');
+   const ribbons=channels.map(channel=>`<path class="si-chamber-ribbon" data-chamber-ribbon="${channel.key}" d="" fill="none" stroke="${channel.color}" opacity="0"/>`).join('');
    const curves=Array.from({length:4},(_,i)=>{
      const points=Array.from({length:85},(_,j)=>{
        const t=j/84, angle=t*Math.PI*3.3+i*Math.PI/2;
@@ -90,8 +123,8 @@ function glass(name,x,y,r,z0,z1,key=null){
      });
      return `<path class="si-vortex" data-vortex="${i}" d="${k.pathOf(points)}" pathLength="100"/>`;
    }).join('');
-   inner=`<g clip-path="url(#si-clip-${name})"><path class="si-chamber-light" d="${paths.fill}"/>${curves}</g>`;
-   metadata.chamber={x:bottom[0],y:bottom[1],top:top[1]};
+   inner=`<g clip-path="url(#si-clip-${name})" aria-hidden="true"><path class="si-chamber-light" d="${interior.fill}"/><path class="si-chamber-fill" data-chamber-fill d="" fill="#c8b693" opacity="0"/>${clouds}${inlets}${ribbons}<ellipse class="si-chamber-surface" data-chamber-surface cx="${bottom[0]}" cy="${bottom[1]}" rx="${fluidRx}" ry="${fluidRy}" fill="#c8b693" opacity="0"/>${curves}</g>`;
+   metadata.chamber={x:bottom[0],y:bottom[1],bottom:bottom[1],top:top[1],rx:fluidRx,ry:fluidRy,fillHeight:bottom[1]-top[1],inletPoints};
  }
  const svg=`<g class="si-glass"${key?` data-vial="${key}" style="color:${channels.find(c=>c.key===key).color}"`:''}><path class="si-glass-back" d="${paths.fill}"/>${inner}<path class="si-glass-surface" d="${paths.fill}"/><path class="si-glass-edge" d="${paths.outline}"/><path class="si-glass-rim" d="${k.ring(x,y,r,z0,P,72)+k.ring(x,y,r,z1,P,72)}"/>${ticks}<path class="si-glass-reflection" d="${k.segment([x-r*.66,y+r*.20,z0+3],[x-r*.66,y+r*.20,z1-3],P)}"/></g>`;
  put(name,[x,y,(z0+z1)/2],svg,A.ring(G.frameAlong([x,y,0],[0,0,1]),z0,z1,r-0.8,r));

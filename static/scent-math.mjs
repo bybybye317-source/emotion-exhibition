@@ -11,7 +11,7 @@ export const CHANNELS = Object.freeze([
 ].map(Object.freeze));
 export const EMOTIONS = Object.freeze(['happiness', 'neutral', 'sadness', 'surprise', 'anger', 'fear', 'disgust', 'contempt']);
 export const EMOTION_LABELS = Object.freeze({happiness: '快乐', neutral: '中性', sadness: '悲伤', surprise: '惊讶', anger: '愤怒', fear: '恐惧', disgust: '厌恶', contempt: '轻蔑'});
-export const PHASE_DURATIONS = Object.freeze({mixing: 3000, releasing: 6000, purging: 8000, waiting: 5000});
+export const PHASE_DURATIONS = Object.freeze({mixing: 9000, releasing: 7000, purging: 8000, waiting: 5000});
 export const SCENT_PROFILES = Object.freeze({
   happiness: Object.freeze([32, 25, 12, 12, 7, 4, 5, 3]),
   neutral: Object.freeze([12, 13, 18, 15, 17, 10, 12, 3]),

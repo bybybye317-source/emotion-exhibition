@@ -1,13 +1,14 @@
-import {recipeForScores, CHANNELS, EMOTION_LABELS, explainIngredient} from './scent-math.mjs?v=20261027-atelier';
-import {ScentSimulator} from './scent-engine.mjs?v=20261027-atelier';
-import {ScentInstrument} from './scent-instrument.mjs?v=20261027-atelier';
+import {recipeForScores, CHANNELS, EMOTION_LABELS, explainIngredient} from './scent-math.mjs?v=20261028-flow';
+import {ScentSimulator} from './scent-engine.mjs?v=20261028-flow';
+import {deriveFluidState} from './scent-fluid.mjs?v=20261028-flow';
+import {ScentInstrument} from './scent-instrument.mjs?v=20261028-flow';
 
 const $ = id => document.getElementById(id);
 const phaseLabels = {stopped:'尚未开启',idle:'等待数据',mixing:'调配中',releasing:'模拟释放中',purging:'模拟清味中',waiting:'等待下一轮'};
 const stopLabels = {'not-started':'尚未开启',manual:'已手动停止',disconnected:'连接中断 · 已停止',hidden:'页面离开前台 · 已停止',cleared:'本轮已清空 · 已停止',heartbeat:'计时中断 · 已停止'};
 const phaseDetails = {
   mixing:'八支原料按本轮比例汇入混合舱，释放口保持关闭。',
-  releasing:'按本轮锁定比例模拟释放；新情绪留待下一轮。',
+  releasing:'混合后的气味缓缓释放，舱内液面逐渐回落；新情绪留待下一轮。',
   purging:'香气通道关闭，洁净空气沿独立管路完成清味。',
   waiting:'清味结束，所有通道关闭，等待下一轮调配。',
   idle:'等待一位观众加入，或选择一种情绪预览。',
@@ -131,13 +132,14 @@ function renderExplanation(state, currentRecipe) {
 function render() {
   if (disposed) return;
   const state = simulator.snapshot();
+  const fluid = deriveFluidState(state);
   const recipe = state.activeRecipe || state.smoothedRecipe || state.targetRecipe;
   const panel = $('scent-panel');
   const phaseChanged = panel.dataset.phase !== state.phase;
   panel.dataset.phase = state.phase;
   panel.dataset.enabled = String(state.enabled);
   panel.dataset.source = preview === 'group' ? 'group' : 'preview';
-  text('scent-status', state.phase === 'stopped' ? stopLabels[state.reason] || '模拟已停止' : phaseLabels[state.phase]);
+  text('scent-status', state.phase === 'stopped' ? stopLabels[state.reason] || '模拟已停止' : fluid.stage === 'dosing' ? '原料汇流中' : fluid.stage === 'blending' ? '缓慢混合中' : phaseLabels[state.phase]);
   text('scent-source', source);
   text('scent-recipe-name', nameRecipe(recipe));
   text('scent-recipe-code', recipe?.code || '—');
@@ -148,7 +150,7 @@ function render() {
   $('scent-stop').disabled = !state.enabled;
   for (const button of document.querySelectorAll('[data-scent-preview]')) button.setAttribute('aria-pressed', String(preview === button.dataset.scentPreview));
   text('scent-countdown', ['stopped','idle'].includes(state.phase) ? '—' : `${Math.max(0, Math.ceil(state.remaining))} 秒`);
-  text('scent-detail', phaseDetails[state.phase] || phaseDetails.stopped);
+  text('scent-detail', fluid.stage === 'dosing' ? '不同颜色的原料沿各自管道汇入舱内，释放口保持关闭。' : fluid.stage === 'blending' ? '进料完成，八种颜色在舱内缓慢交融；混合后才开始释放。' : phaseDetails[state.phase] || phaseDetails.stopped);
   const progress = Math.round(Math.max(0, Math.min(1, state.progress || 0)) * 100);
   $('scent-progress').setAttribute('aria-valuenow', String(progress));
   $('scent-progress').setAttribute('aria-valuetext', `${phaseLabels[state.phase] || '停止'}，${progress}%`);
@@ -171,7 +173,7 @@ function render() {
   }
   $('scent-pending').hidden = !state.pending;
   if (state.pending && state.targetRecipe) text('scent-pending', '新情绪已进入下一轮目标。本轮配方与解释保持不变，后续调配将逐步靠近目标；点击“下一轮目标”查看变化。');
-  instrument?.update({phase:state.phase,progress:state.progress,outputs:state.outputs,purge:state.purge,recipe,targetRecipe:state.targetRecipe,pending:state.pending,selectedKey,enabled:state.enabled});
+  instrument?.update({phase:state.phase,progress:state.progress,outputs:state.outputs,purge:state.purge,recipe,activeRecipe:state.activeRecipe,targetRecipe:state.targetRecipe,pending:state.pending,selectedKey,enabled:state.enabled});
   renderExplanation(state, recipe);
   const signature = JSON.stringify(state.logs);
   if (signature !== logSignature) {

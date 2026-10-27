@@ -40,7 +40,8 @@
 .scent-instrument-mount .si-scale{fill:none;stroke:#a9b3a9;stroke-width:.55;stroke-opacity:.36}
 .scent-instrument-mount .si-liquid{opacity:.32}
 .scent-instrument-mount .si-meniscus{opacity:.45}
-.scent-instrument-mount .si-flow{fill:none;stroke:#d5c6a6;stroke-width:1.3;stroke-linecap:round;stroke-dasharray:10 90;opacity:0}
+.scent-instrument-mount .si-flow-track{fill:none;stroke-width:3.2;stroke-linecap:butt;opacity:0}
+.scent-instrument-mount .si-flow{fill:none;stroke-width:1.8;stroke-linecap:round;opacity:0}
 .scent-instrument-mount .si-pipe[data-selected="true"] .tb-shine{fill:#cfb98e;opacity:.95}
 .scent-instrument-mount .si-pipe[data-selected="true"] .tb-body{fill:#7b7463}
 .scent-instrument-mount .si-purge .si-flow{stroke:#aec6c9}
@@ -62,3 +63,13 @@
 @media (prefers-reduced-motion:reduce) {
  .scent-instrument-mount *, .scent-instrument-mount *::before, .scent-instrument-mount *::after {animation:none!important;transition:none!important}
 }
+
+/* Color belongs to the moving material; metal and glass keep neutral edges. */
+.scent-instrument-mount .si-chamber-cloud { filter:var(--si-soft-url); pointer-events:none; }
+.scent-instrument-mount .si-chamber-fill { stroke:none; }
+.scent-instrument-mount .si-chamber-surface { stroke:#d9e3dd; stroke-width:.55; stroke-opacity:.35; }
+.scent-instrument-mount .si-chamber-inlet { stroke-width:2.4; stroke-linecap:round; stroke-dasharray:7 11; }
+.scent-instrument-mount .si-chamber-ribbon { stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:38 10; }
+
+.scent-instrument-mount:is([data-fluid-stage="blending"],[data-fluid-stage="releasing"],[data-fluid-stage="purging"]) .si-pipe[data-selected="true"] .tb-shine { fill:#89928a; opacity:.6; }
+.scent-instrument-mount:is([data-fluid-stage="blending"],[data-fluid-stage="releasing"],[data-fluid-stage="purging"]) .si-pipe[data-selected="true"] .tb-body { fill:#525b5a; }

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import {anatomicalFragmentCells,fragmentBounds} from './portrait-regions.mjs?v=20261028-anatomy';
-import {contributionMotion} from './portrait-arrival.mjs?v=20261028-anatomy';
+import {anatomicalFragmentCells,fragmentBounds} from './portrait-regions.mjs?v=20261028-real';
+import {contributionMotion} from './portrait-arrival.mjs?v=20261028-real';
 export class ContributionGuide {
  constructor(stage){
   this.stage=stage;this.card=document.getElementById('portrait-piece-card');
@@ -38,7 +38,7 @@ export class ContributionGuide {
    const distance=(uv.getX(i)-cx)**2+(uv.getY(i)-cy)**2;
    if(position.getZ(i)>0&&distance<best){best=distance;this.vertex=i;}
   }
-  document.getElementById('portrait-piece-title').textContent=replay?'最近加入的片段':'这是你贡献的片段';
+  document.getElementById('portrait-piece-title').textContent=replay?'正在定位这位观众':'这是你贡献的片段';
   document.getElementById('portrait-piece-location').textContent=location;
  }
  update(arrival,camera,reduced){

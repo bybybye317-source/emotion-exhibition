@@ -11,7 +11,7 @@ const cross=(a,b,c)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
 
 test('curved fragments form one complete frame with exactly shared reversed seams',()=>{
   const cells=organicFragmentCells(),edges=new Map();
-  assert.equal(cells.length,20);
+  assert.equal(cells.length,32);
   for(const [cellIndex,cell] of cells.entries())for(let i=0;i<cell.length;i++) {
     const a=cell[i],b=cell[(i+1)%cell.length];
     assert.notDeepEqual(a,b,'no zero-length edge');

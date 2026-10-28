@@ -1,5 +1,5 @@
 import {BrowserEmotionAnalyzer} from './browser-inference.mjs?v=20261028-anatomy';
-import {LocalSession, EMOTION_KEYS} from './session-state.mjs?v=20261027-fragments';
+import {LocalSession, EMOTION_KEYS} from './session-state.mjs?v=20261028-real';
 import {CAPTURE_POLICY, CAPTURE_DURATION_LABEL, CaptureWindow} from './capture-window.mjs?v=20261028-fast';
 
 const $=id=>document.getElementById(id);
@@ -65,7 +65,7 @@ async function ensureModel(){
     initPromise=analyzer.init(message=>{if(!disposed){state.model.detail=String(message);render();}}).then(()=>{state.model={status:'ready',detail:'模型就绪'};}).catch(e=>{state.model={status:'error',detail:`识别加载失败：${e.message}。仍可使用情绪联动预览。`};throw e;}).finally(()=>{initPromise=null;render();});}
   return initPromise;
 }
-const blobFromCanvas=canvas=>new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('照片生成失败')),'image/jpeg',.86));
+const blobFromCanvas=canvas=>new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('照片生成失败')),'image/jpeg',.94));
 function cancelCapture(detail='采集已停止。'){
   clearTimeout(captureTimer);captureTimer=null;captureRun?.cancel();captureRun=null;
   if(state.capture.status==='capturing')state.capture={status:'idle',detail,progress:0};
@@ -82,7 +82,7 @@ async function cameraLoop(generation){
     if(video.readyState<2||!video.videoWidth){loopTimer=setTimeout(()=>cameraLoop(generation),100);return;}
     // Bind the window before inference: a frame already in flight at the click cannot count.
     const run=captureRun, frameStartedAt=performance.now();
-    const scale=Math.min(1,960/video.videoWidth);frame.width=Math.round(video.videoWidth*scale);frame.height=Math.round(video.videoHeight*scale);frameContext.drawImage(video,0,0,frame.width,frame.height);
+    const scale=Math.min(1,1280/video.videoWidth);frame.width=Math.round(video.videoWidth*scale);frame.height=Math.round(video.videoHeight*scale);frameContext.drawImage(video,0,0,frame.width,frame.height);
     const result=await analyzer.analyze(frame);
     if(disposed||generation!==cameraGeneration)return;
     state.live={...result,last_update:Date.now()/1000};
@@ -101,7 +101,7 @@ $('start-camera').addEventListener('click',async()=>{
   if(pending()||stream)return;error();const generation=++cameraGeneration;state.camera={status:'starting',detail:'请允许浏览器使用摄像头。若一直等待，可检查系统权限或停止后用照片参与。'};render();
   try{
     if(!navigator.mediaDevices?.getUserMedia)throw new Error('当前环境不支持摄像头，请使用 HTTPS 页面或照片参与。');
-    const next=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:960},height:{ideal:720}},audio:false});
+    const next=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:960}},audio:false});
     if(disposed||generation!==cameraGeneration){next.getTracks().forEach(track=>track.stop());return;}
     stream=next;video.srcObject=stream;await video.play();render();await ensureModel();
     if(disposed||generation!==cameraGeneration)return;

@@ -1,6 +1,6 @@
 import {balancePhotoLighting} from './portrait-lighting.mjs?v=20261028-light';
-import {refineFeatureWarp} from './portrait-features.mjs?v=20261028-anatomy';
-import {affineFromTriangles, photoTriangle, organicFragmentCells, planPatchAssignments} from './portrait-math.mjs?v=20261028-anatomy';
+import {refineFeatureWarp} from './portrait-features.mjs?v=20261028-real';
+import {affineFromTriangles, photoTriangle, organicFragmentCells, planPatchAssignments} from './portrait-math.mjs?v=20261028-real';
 
 const DEFAULT_COLOR = '#aaa69e';
 const makeCanvas = size => Object.assign(document.createElement('canvas'), {width:size, height:size});
@@ -183,18 +183,20 @@ export function createAlignedPhoto(image, anchors, {size=1024,bounds,landmarks,b
 }
 
 /**
- * Paint one region per person over an already assembled seed face. Preserve
- * null entries in alignedImages: their original slots use their own seed, so
+ * Paint one region per person over the blank sculpture. Preserve
+ * null entries in alignedImages: their original slots remain blank, so
  * a failed load cannot move another person's fragment. No photo is repeated
- * across vacant cells or enlarged into the whole face.
+ * across vacant cells or enlarged into the whole face. Coverage is separate
+ * from colour so an unoccupied eye retains the sculpture material.
  */
-export function paintCollage(ctx, alignedImages, size=1024, baseColor=DEFAULT_COLOR, {records,seedImages=[]}={}) {
+export function paintCollage(ctx, alignedImages, size=1024, baseColor=DEFAULT_COLOR, {records,coverageContext}={}) {
   const photos=Array.isArray(alignedImages)?alignedImages:[];
   const assignments=planPatchAssignments(records ?? photos.map((_,index)=>({id:`photo-${index}`})));
-  const sources=assignments.map(({recordIndex,seedIndex})=>(recordIndex===null?null:photos[recordIndex]) || seedImages[seedIndex] || null);
+  const sources=assignments.map(({recordIndex})=>(recordIndex===null?null:photos[recordIndex]) || null);
   ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;ctx.filter='none';
   ctx.fillStyle=baseColor;ctx.fillRect(0,0,size,size);
-  if(!sources.some(Boolean)){ctx.restore();return;}
+  if(coverageContext){coverageContext.save();coverageContext.setTransform(1,0,0,1,0,0);coverageContext.globalCompositeOperation='source-over';coverageContext.clearRect(0,0,size,size);coverageContext.fillStyle='#000';coverageContext.fillRect(0,0,size,size);coverageContext.globalCompositeOperation='lighter';}
+  if(!sources.some(Boolean)){coverageContext?.restore();ctx.restore();return;}
   const cells=organicFragmentCells().map(cell=>cell.map(([x,y])=>[x*size,y*size]));
   // Blurred partition masks still sum to one in the interior. Add their
   // premultiplied colours instead of stacking transparent layers, which would
@@ -202,10 +204,11 @@ export function paintCollage(ctx, alignedImages, size=1024, baseColor=DEFAULT_CO
   ctx.clearRect(0,0,size,size);ctx.globalCompositeOperation='lighter';
   const mask=makeCanvas(size), maskCtx=mask.getContext('2d');
   const layer=makeCanvas(size), layerCtx=layer.getContext('2d');
-  const feather=Math.max(.6,4.5*size/1024);
+  const feather=Math.max(.6,1.8*size/1024);
   cells.forEach((cell,index)=>{
     maskCtx.clearRect(0,0,size,size);maskCtx.filter=`blur(${feather}px)`;
     maskCtx.fillStyle='#fff';polygon(maskCtx,cell);maskCtx.fill();maskCtx.filter='none';
+    if(sources[index]&&coverageContext)coverageContext.drawImage(mask,0,0);
     layerCtx.globalCompositeOperation='source-over';layerCtx.clearRect(0,0,size,size);
     if(sources[index]) layerCtx.drawImage(sources[index],0,0,size,size);
     else {layerCtx.fillStyle=baseColor;layerCtx.fillRect(0,0,size,size);}
@@ -215,5 +218,5 @@ export function paintCollage(ctx, alignedImages, size=1024, baseColor=DEFAULT_CO
   ctx.globalCompositeOperation='destination-over';ctx.fillStyle=baseColor;ctx.fillRect(0,0,size,size);
   // Release large scratch stores immediately; the final atlas stays in memory.
   mask.width=mask.height=layer.width=layer.height=1;
-  ctx.restore();
+  coverageContext?.restore();ctx.restore();
 }

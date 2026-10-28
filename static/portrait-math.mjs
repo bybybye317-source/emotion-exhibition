@@ -1,4 +1,4 @@
-import {anatomicalFragmentCells} from './portrait-regions.mjs?v=20261028-anatomy';
+import {anatomicalFragmentCells, PORTRAIT_REGION_COUNT} from './portrait-regions.mjs?v=20261028-real';
 // Artistic expression mapping: these are animation choices, not measured AUs.
 export const LABELS = {happiness:'快乐', neutral:'中性', sadness:'悲伤', surprise:'惊讶', anger:'愤怒', fear:'恐惧', disgust:'厌恶', contempt:'轻蔑'};
 
@@ -56,11 +56,11 @@ export const PATCH_SEEDS = [
 
 // Start on a recognisable eye/cheek/forehead, then spread contributions across
 // the face. A new cycle replaces just the oldest contribution's region.
-export const FRAGMENT_SLOT_ORDER = Object.freeze([4,10,1,8,5,14,9,0,16,7,2,13,6,18,3,15,11,17,12,19]);
+export const FRAGMENT_SLOT_ORDER = Object.freeze([4,5,14,9,8,10,1,0,2,13,15,18,3,6,7,11,12,16,17,19,20,21,22,23,24,25,26,27,28,29,30,31]);
 
-const validSlotCount = count => Number.isInteger(count) && count > 0 && count <= PATCH_SEEDS.length;
+const validSlotCount = count => Number.isInteger(count) && count > 0 && count <= PORTRAIT_REGION_COUNT;
 
-export function fragmentSlot(sequence, slotCount=PATCH_SEEDS.length) {
+export function fragmentSlot(sequence, slotCount=PORTRAIT_REGION_COUNT) {
   if(!Number.isSafeInteger(sequence) || sequence<0) throw new RangeError('Invalid fragment sequence');
   if(!validSlotCount(slotCount)) throw new RangeError('Invalid fragment slot count');
   const order=FRAGMENT_SLOT_ORDER.filter(slot=>slot<slotCount);
@@ -70,12 +70,12 @@ export function fragmentSlot(sequence, slotCount=PATCH_SEEDS.length) {
 /**
  * Plan one fixed region per participant. Records are oldest first, and a
  * stored slot survives removal, failed photo loads and arrival of others.
- * The newest record wins duplicate IDs/slots; unoccupied slots retain seeds.
+ * The newest record wins duplicate IDs/slots; unoccupied slots remain blank.
  * Index-based slots are only a compatibility path for older session records.
  */
-export function planPatchAssignments(records=[], slotCount=PATCH_SEEDS.length) {
+export function planPatchAssignments(records=[], slotCount=PORTRAIT_REGION_COUNT) {
   if(!validSlotCount(slotCount)) throw new RangeError('Invalid fragment slot count');
-  const plan=Array.from({length:slotCount},(_,slot)=>({slot,recordIndex:null,participantId:null,seedIndex:slot}));
+  const plan=Array.from({length:slotCount},(_,slot)=>({slot,recordIndex:null,participantId:null}));
   const seen=new Set();
   for(let index=(Array.isArray(records)?records.length:0)-1;index>=0;index--) {
     const record=records[index];
@@ -85,7 +85,7 @@ export function planPatchAssignments(records=[], slotCount=PATCH_SEEDS.length) {
     if(id!==null) seen.add(id);
     const slot=record.slot===undefined?fragmentSlot(index,slotCount):record.slot;
     if(!Number.isInteger(slot) || slot<0 || slot>=slotCount || plan[slot].recordIndex!==null) continue;
-    plan[slot]={slot,recordIndex:index,participantId:id,seedIndex:slot};
+    plan[slot]={slot,recordIndex:index,participantId:id};
   }
   return plan;
 }

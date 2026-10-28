@@ -5,7 +5,7 @@ import {FragmentArrival,blendLinearPixels} from '../static/portrait-arrival.mjs'
 test('arrival begins with unique valid regions and leaves an empty request idle',()=>{
   const arrival=new FragmentArrival();
   assert.deepEqual(arrival.snapshot(),{slots:[],mix:1,glow:0,active:false,elapsed:0,phase:'idle'});
-  assert.deepEqual(arrival.begin([4,4,10,-1,20,2.5,'3',NaN]),
+  assert.deepEqual(arrival.begin([4,4,10,-1,32,2.5,'3',NaN]),
     {slots:[4,10],mix:0,glow:0,active:true,elapsed:0,phase:'waiting'});
   const snapshot=arrival.snapshot();snapshot.slots.push(9);
   assert.deepEqual(arrival.snapshot().slots,[4,10]);

@@ -1,19 +1,19 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {createAlignedPhoto, paintCollage} from './portrait-collage.mjs?v=20261028-light';
-import {ARRIVAL_SECONDS, FragmentArrival, blendLinearPixels} from './portrait-arrival.mjs?v=20261028-anatomy';
-import {LABELS, morphWeights, normalizeScores, organicFragmentCells, planPatchAssignments} from './portrait-math.mjs?v=20261028-anatomy';
+import {createAlignedPhoto, paintCollage} from './portrait-collage.mjs?v=20261028-real';
+import {ARRIVAL_SECONDS, FragmentArrival, blendCoveredPixels} from './portrait-arrival.mjs?v=20261028-real';
+import {LABELS, morphWeights, normalizeScores, organicFragmentCells, planPatchAssignments} from './portrait-math.mjs?v=20261028-real';
 
-import {calibratedProjection} from './portrait-features.mjs?v=20261028-anatomy';
-import {ContributionGuide} from './portrait-contribution.mjs?v=20261028-anatomy';
+import {calibratedProjection} from './portrait-features.mjs?v=20261028-real';
+import {ContributionGuide} from './portrait-contribution.mjs?v=20261028-real';
 
 const $ = id => document.getElementById(id);
 const SIZE = 1024;
 const BASE_COLOR = '#aeb0ae';
-const SEED_URL = new URL('./portrait-seeds/manifest.json', import.meta.url);
+import {PORTRAIT_REGION_COUNT, REGION_NAMES} from './portrait-regions.mjs?v=20261028-real';
+import {PortraitSources, createSourceThumbnail, sourceLabel} from './portrait-sources.mjs?v=20261028-real';
 const photoKey = record => JSON.stringify([record.id,record.image_url,record.photo_anchors]);
-const REGION_NAMES=['左侧额头','额头中央','右侧额头','左侧太阳穴','左侧眉眼','右侧眉眼','右侧太阳穴','左侧脸颊外缘','左侧脸颊','鼻梁与鼻翼','右侧脸颊','右侧脸颊外缘','左侧下颊','左侧嘴角','完整唇部','右侧嘴角','右侧下颊','左侧下颌','下巴中央','右侧下颌'];
 const MODEL_URL = new URL('./models/sculpture-head.glb', import.meta.url);
 const clamp01 = value => Math.min(1,Math.max(0,value));
 const smooth = (a,b,x) => {const t=clamp01((x-a)/(b-a));return t*t*(3-2*t);};
@@ -22,7 +22,7 @@ const canvas = () => Object.assign(document.createElement('canvas'), {width:SIZE
 class GroupPortrait {
   constructor(stage) {
     this.stage=stage;this.connected=false;this.records=[];this.scores={};this.preview='group';
-    this.photoCache=new Map();this.seedAtlas=null;this.seedLoading=false;this.seedFailure=null;
+    this.photoCache=new Map();this.sourceCache=new Map();this.sources=new PortraitSources(id=>this.replayContribution(id));
     this.generation=0;this.signature=null;this.loadedCount=0;this.loadingPhotos=false;
     this.targetMorphs={};this.morphMeshes=[];this.autoRotate=false;this.ready=false;this.failure=null;
     this.abort=null;this.disposed=false;this.lastFrame=performance.now();this.lastStats=0;this.blend=0;
@@ -31,11 +31,14 @@ class GroupPortrait {
     this.texture.anisotropy=4;this.texture.flipY=true;
     this.photoUniform={value:0};
     this.arrival=new FragmentArrival();this.arrivalUniform={value:1};this.glowUniform={value:0};
-    this.presentedKeys=new Map();this.presentedSeed=null;this.presentationReady=false;this.lastArrivalSlots=[];
+    this.presentedKeys=new Map();this.presentationReady=false;this.lastArrivalSlots=[];
     this.fromAtlas=canvas();this.fromContext=this.fromAtlas.getContext('2d',{willReadFrequently:true});
     this.fromContext.drawImage(this.atlas,0,0);
     this.fromTexture=new THREE.CanvasTexture(this.fromAtlas);this.fromTexture.colorSpace=THREE.SRGBColorSpace;
     this.fromTexture.flipY=true;this.fromTexture.anisotropy=4;
+    this.coverage=canvas();this.coverageContext=this.coverage.getContext('2d',{willReadFrequently:true});
+    this.fromCoverage=canvas();this.fromCoverageContext=this.fromCoverage.getContext('2d',{willReadFrequently:true});
+    this.coverageTexture=new THREE.CanvasTexture(this.coverage);this.fromCoverageTexture=new THREE.CanvasTexture(this.fromCoverage);
     this.arrivalMask=canvas();this.arrivalMaskContext=this.arrivalMask.getContext('2d');
     this.arrivalMaskTexture=new THREE.CanvasTexture(this.arrivalMask);
     this.arrivalMaskTexture.flipY=true;this.arrivalMaskTexture.generateMipmaps=false;
@@ -116,7 +119,7 @@ class GroupPortrait {
       this.model=candidate;candidate=null;
       this.scene.add(this.model);this.ready=true;
       this.stage.dataset.model='ready';this.stage.dataset.geometry='sculpted-expression-mask';
-      this.loadSeedPhotos();this.loadPhotos(this.records);this.updateStatus();
+      this.loadPhotos(this.records);this.updateStatus();
     } catch(error) {
       candidate?.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});
       this.morphMeshes=[];this.head=null;
@@ -130,6 +133,8 @@ class GroupPortrait {
     material.onBeforeCompile=shader=>{
       shader.uniforms.portraitPhotoMix=this.photoUniform;
       shader.uniforms.portraitPreviousMap={value:this.fromTexture};
+      shader.uniforms.portraitCoverage={value:this.coverageTexture};
+      shader.uniforms.portraitPreviousCoverage={value:this.fromCoverageTexture};
       shader.uniforms.portraitArrivalMask={value:this.arrivalMaskTexture};
       shader.uniforms.portraitArrivalMix=this.arrivalUniform;
       shader.uniforms.portraitArrivalGlow=this.glowUniform;
@@ -137,9 +142,13 @@ class GroupPortrait {
       shader.uniforms.portraitBaseColor={value:new THREE.Color(BASE_COLOR)};
       shader.vertexShader='attribute float portraitWeight;\nvarying float vPortraitWeight;\nvarying vec3 vSculpturePosition;\n'+shader.vertexShader;
       shader.vertexShader=shader.vertexShader.replace('#include <uv_vertex>','#include <uv_vertex>\nvPortraitWeight = portraitWeight;\nvSculpturePosition = position;');
-      shader.fragmentShader='uniform sampler2D portraitPreviousMap;\nuniform sampler2D portraitArrivalMask;\nuniform float portraitArrivalMix;\nuniform float portraitArrivalGlow;\nuniform vec3 portraitEyeCenter;\nuniform float portraitPhotoMix;\nuniform vec3 portraitBaseColor;\nvarying float vPortraitWeight;\nvarying vec3 vSculpturePosition;\n'+shader.fragmentShader;
+      shader.fragmentShader='uniform sampler2D portraitCoverage;\nuniform sampler2D portraitPreviousCoverage;\nuniform sampler2D portraitPreviousMap;\nuniform sampler2D portraitArrivalMask;\nuniform float portraitArrivalMix;\nuniform float portraitArrivalGlow;\nuniform vec3 portraitEyeCenter;\nuniform float portraitPhotoMix;\nuniform vec3 portraitBaseColor;\nvarying float vPortraitWeight;\nvarying vec3 vSculpturePosition;\n'+shader.fragmentShader;
       shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',`
-        vec3 photograph = mix(texture2D(portraitPreviousMap, vMapUv).rgb, texture2D(map, vMapUv).rgb, portraitArrivalMix);
+        float beforeCoverage=texture2D(portraitPreviousCoverage,vMapUv).r*(1.0-portraitArrivalMix);
+        float afterCoverage=texture2D(portraitCoverage,vMapUv).r*portraitArrivalMix;
+        float coverage=beforeCoverage+afterCoverage;
+        vec3 photograph=(texture2D(portraitPreviousMap,vMapUv).rgb*beforeCoverage+texture2D(map,vMapUv).rgb*afterCoverage)/max(coverage,0.00001);
+        float photoPresence=coverage*portraitPhotoMix;
         // Continue nearby skin over the outer mask instead of revealing a
         // grey rim. Sample inside the face so hair/background cannot stretch
         // across the silhouette; the same arrival mix keeps joins continuous.
@@ -150,8 +159,11 @@ class GroupPortrait {
         vec3 edgeSkin = mix(
           textureLod(portraitPreviousMap, edgeUv, edgeLod).rgb,
           textureLod(map, edgeUv, edgeLod).rgb,
-          portraitArrivalMix
+          afterCoverage/max(coverage,0.00001)
         );
+        float edgeCoverage=mix(textureLod(portraitPreviousCoverage,edgeUv,edgeLod).r,textureLod(portraitCoverage,edgeUv,edgeLod).r,portraitArrivalMix);
+        vec3 localEdge=mix(textureLod(portraitPreviousMap,vMapUv,edgeLod).rgb,textureLod(map,vMapUv,edgeLod).rgb,afterCoverage/max(coverage,0.00001));
+        edgeSkin=mix(localEdge,edgeSkin,smoothstep(0.35,0.92,edgeCoverage));
         vec3 surface = mix(edgeSkin * 0.72, photograph, vPortraitWeight);
         // Quiet mineral variation, evaluated in object space so it stays on the sculpture.
         float grain = fract(sin(dot(floor(vSculpturePosition * 380.0), vec3(12.9898,78.233,39.425))) * 43758.5453);
@@ -160,21 +172,23 @@ class GroupPortrait {
         float iris = 1.0-smoothstep(0.050,0.060,eyeRadius);
         float pupil = 1.0-smoothstep(0.018,0.026,eyeRadius);
         stone *= 1.0 - iris*0.24 - pupil*0.32;
-        diffuseColor.rgb *= mix(stone, surface, portraitPhotoMix);
+        diffuseColor.rgb *= mix(stone, surface * 0.30, photoPresence);
       `);
       shader.fragmentShader=shader.fragmentShader.replace('#include <emissivemap_fragment>', `
         #include <emissivemap_fragment>
+        // Preserve the photographed details and illumination; a smaller lit
+        // component still follows the sculpture instead of double-lighting skin.
+        totalEmissiveRadiance += surface * 0.70 * photoPresence;
         vec4 arrivalMask = texture2D(portraitArrivalMask, vMapUv);
         float arrivalLight = (arrivalMask.r * 0.16 + arrivalMask.g * 0.022) * arrivalMask.a;
         totalEmissiveRadiance += vec3(0.95, 0.72, 0.40) * arrivalLight * portraitArrivalGlow * vPortraitWeight;
       `);
     };
-    material.customProgramCacheKey=()=> 'sculpted-portrait-collage-v6';
+    material.customProgramCacheKey=()=> 'sculpted-portrait-collage-v7';
     return material;
   }
 
   bindControls() {
-    $('portrait-retry-seeds').addEventListener('click',()=>this.loadSeedPhotos());
     $('portrait-retry-model').addEventListener('click',()=>this.loadModel());
     $('portrait-show-piece').addEventListener('click',()=>this.replayContribution());
     $('portrait-reset-view').addEventListener('click',()=>this.resetView());
@@ -221,7 +235,7 @@ class GroupPortrait {
     if(!state?.session)return;
     const reconnected=connected&&!this.connected;
     this.connected=connected;
-    this.records=(state.session.participants||[]).slice(-20);
+    this.records=(state.session.participants||[]).slice(-PORTRAIT_REGION_COUNT);
     this.scores=normalizeScores(state.session.group_scores);
     const signature=JSON.stringify(this.records.map(p=>[p.id,p.slot,p.image_url,p.photo_anchors]));
     if(signature!==this.signature) {
@@ -266,16 +280,14 @@ class GroupPortrait {
 
   updateStatus() {
     $('portrait-count').textContent=`${this.records.length} 位观众`;
-    let status=this.records.length?'每个人的一部分，成为共同的脸':'一张已经相遇的脸';
-    let detail=this.seedAtlas?'空位由 20 张 AI 虚构面孔的片段填充，不计入观众或情绪数据。':'初始拼脸正在准备。';
-    if(this.records.length) detail=`${this.loadedCount} 块观众片段 · ${20-this.loadedCount} 块${this.seedAtlas?'示例片段':'待填充区域'}。每次采集只替换一块，其余位置保持不变。`;
+    let status=this.records.length?'每一块照片，都有自己的来处':'等待第一张真实面孔';
+    let detail=`空白模型上的 ${PORTRAIT_REGION_COUNT} 处细分区域，等待观众逐一填入。眉眼、鼻子与嘴唇保留完整。`;
+    if(this.records.length)detail=`${this.loadedCount} 块观众照片 · ${PORTRAIT_REGION_COUNT-this.loadedCount} 处空白。点击下方观众照片，查看他贡献的位置。`;
     const arrival=this.arrival.snapshot();
-    if(this.lastArrivalSlots.length&&this.loadedCount)detail+=` 最近融入：${this.arrivalLocation()}。`;
+    if(this.lastArrivalSlots.length&&this.loadedCount)detail+=` 当前定位：${this.arrivalLocation()}。`;
     if(arrival.active){status='你的片段正在融入';detail=`${this.arrivalLocation()}正在慢慢浮现，柔光会在融入后散去。`;}
     if(this.loadingPhotos) status='正在将新片段拼入肖像…';
     else if(this.loadedCount<this.records.length) status=`已拼入 ${this.loadedCount}/${this.records.length} 块；部分照片不可用`;
-    if(this.seedLoading&&!this.records.length)status='正在拼合初始面孔…';
-    if(this.seedFailure)detail='初始素材暂未加载。可以重试，或直接采集观众片段。';
     if(this.preview!=='group') status=`预览：${LABELS[this.preview]} · 不改变采集数据`;
     if(!this.connected) status='正在准备本地体验';
     if(!this.ready) status='正在加载三维人脸…';
@@ -283,58 +295,12 @@ class GroupPortrait {
     if($('portrait-status').textContent!==status)$('portrait-status').textContent=status;
     if($('portrait-empty-hint').textContent!==detail)$('portrait-empty-hint').textContent=detail;
     $('portrait-empty-hint').hidden=false;
-    $('portrait-retry-seeds').hidden=!this.seedFailure;
     $('portrait-show-piece').disabled=arrival.active||!this.records.some(record=>this.photoCache.has(photoKey(record)));
     this.stage.dataset.participants=String(this.records.length);
     this.stage.dataset.photos=String(this.loadedCount);
-    this.stage.dataset.seeds=this.seedAtlas?'20':'0';
-    this.stage.dataset.seedStatus=this.seedLoading?'loading':this.seedFailure?'error':this.seedAtlas?'ready':'waiting';
+    this.stage.dataset.seeds='0';this.stage.dataset.regions=String(PORTRAIT_REGION_COUNT);
+    this.sources.update(this.records,this.sourceCache,{busy:arrival.active});
     this.stage.dataset.connected=String(this.connected);
-  }
-
-  async loadSeedPhotos() {
-    if(!this.ready||this.disposed||this.seedLoading||this.seedAtlas)return;
-    this.seedLoading=true;this.seedFailure=null;this.updateStatus();
-    this.seedAbort=new AbortController();
-    const timeout=setTimeout(()=>this.seedAbort.abort(),20000);
-    let image=null,assembled=null;
-    const aligned=[];
-    try {
-      const response=await fetch(new URL('./portrait-seeds/manifest.json?v=20261028-anatomy',import.meta.url),{signal:this.seedAbort.signal});
-      if(!response.ok)throw new Error('初始面孔清单不可用');
-      const manifest=await response.json();
-      if(manifest.faces?.length!==20)throw new Error('初始面孔数量不完整');
-      const imageUrl=new URL(manifest.image,SEED_URL);
-      if(imageUrl.origin!==location.origin)throw new Error('初始素材来源无效');
-      const photo=await fetch(imageUrl,{signal:this.seedAbort.signal});
-      if(!photo.ok)throw new Error('初始面孔素材不可用');
-      image=await createImageBitmap(await photo.blob());
-      if(this.disposed)return;
-      for(const face of manifest.faces) {
-        const [x,y,width,height]=face.rect;
-        const tile=Object.assign(document.createElement('canvas'),{width,height});
-        tile.getContext('2d').drawImage(image,x,y,width,height,0,0,width,height);
-        try {aligned.push(createAlignedPhoto(tile,face.photo_anchors,{size:SIZE,...this.projection,baseColor:BASE_COLOR}));}
-        finally {tile.width=tile.height=1;}
-      }
-      assembled=canvas();
-      paintCollage(assembled.getContext('2d'),[],SIZE,BASE_COLOR,{records:[],seedImages:aligned});
-      this.seedAtlas=assembled;assembled=null;
-      if(!this.presentedKeys.size) {
-        // A pending first visitor still starts from the complete seed face.
-        this.atlasContext.clearRect(0,0,SIZE,SIZE);this.atlasContext.drawImage(this.seedAtlas,0,0);
-        this.texture.needsUpdate=true;this.arrivalUniform.value=1;this.snapshotAppearance();
-        this.presentationReady=true;
-      }
-    } catch(error) {
-      if(!this.disposed)this.seedFailure=error.message;
-    } finally {
-      clearTimeout(timeout);image?.close();
-      aligned.forEach(photo=>{photo.width=photo.height=1;});
-      if(assembled)assembled.width=assembled.height=1;
-      this.seedLoading=false;
-      if(!this.disposed){this.repaintPhotos();this.updateStatus();}
-    }
   }
 
   arrivalLocation() {
@@ -357,39 +323,35 @@ class GroupPortrait {
     const mix=this.arrivalUniform.value;
     if(mix>=1) {
       this.fromContext.clearRect(0,0,SIZE,SIZE);this.fromContext.drawImage(this.atlas,0,0);
+      this.fromCoverageContext.clearRect(0,0,SIZE,SIZE);this.fromCoverageContext.drawImage(this.coverage,0,0);
     } else if(mix>0) {
       const from=this.fromContext.getImageData(0,0,SIZE,SIZE);
       const to=this.atlasContext.getImageData(0,0,SIZE,SIZE);
-      blendLinearPixels(from.data,to.data,mix,from.data);this.fromContext.putImageData(from,0,0);
+      const oldMask=this.fromCoverageContext.getImageData(0,0,SIZE,SIZE),newMask=this.coverageContext.getImageData(0,0,SIZE,SIZE);
+      blendCoveredPixels(from.data,to.data,oldMask.data,newMask.data,mix);this.fromContext.putImageData(from,0,0);this.fromCoverageContext.putImageData(oldMask,0,0);
     }
-    this.fromTexture.needsUpdate=true;
+    this.fromTexture.needsUpdate=true;this.fromCoverageTexture.needsUpdate=true;
   }
 
   repaintPhotos({immediate=false}={}) {
     if(this.disposed||!this.ready)return;
     const aligned=this.records.map(record=>this.photoCache.get(photoKey(record))||null);
     this.loadedCount=aligned.filter(Boolean).length;
-    // Wait for the initial seed attempt so a first visitor emerges from the
-    // assembled face, even when their photo finishes loading before the atlas.
-    if(this.seedLoading&&!this.seedAtlas&&this.records.length)return;
-    const seedImages=this.seedAtlas?Array(20).fill(this.seedAtlas):[];
     if(!this.presentationReady) {
-      paintCollage(this.atlasContext,[],SIZE,BASE_COLOR,{records:[],seedImages});
+      paintCollage(this.atlasContext,[],SIZE,BASE_COLOR,{records:[],coverageContext:this.coverageContext});
       this.arrivalUniform.value=1;this.presentationReady=true;
     }
     const nextKeys=new Map(planPatchAssignments(this.records).filter(p=>p.recordIndex!==null&&aligned[p.recordIndex]).map(p=>[p.slot,photoKey(this.records[p.recordIndex])]));
     const arrivals=[...nextKeys].filter(([slot,key])=>this.presentedKeys.get(slot)!==key).map(([slot])=>slot);
     const removed=[...this.presentedKeys.keys()].some(slot=>!nextKeys.has(slot));
-    const seedChanged=this.presentedSeed!==this.seedAtlas;
     // A failed image retry must not fast-forward another person's active fade.
-    if(!immediate&&!arrivals.length&&!removed&&!seedChanged)return;
-    const activeArrival=this.arrival.snapshot();
-    const revealSlots=arrivals.length?arrivals:seedChanged&&activeArrival.active?activeArrival.slots:[];
+    if(!immediate&&!arrivals.length&&!removed)return;
+    const revealSlots=arrivals;
     // An interrupted fade starts from the currently visible colour, not its
-    // old source or destination. Only two atlas textures are uploaded per join.
+    // old source or destination. Colour and coverage move together per join.
     this.snapshotAppearance();
-    paintCollage(this.atlasContext,aligned,SIZE,BASE_COLOR,{records:this.records,seedImages});
-    this.texture.needsUpdate=true;this.presentedKeys=nextKeys;this.presentedSeed=this.seedAtlas;
+    paintCollage(this.atlasContext,aligned,SIZE,BASE_COLOR,{records:this.records,coverageContext:this.coverageContext});
+    this.texture.needsUpdate=true;this.coverageTexture.needsUpdate=true;this.presentedKeys=nextKeys;
     if(!immediate&&!removed&&revealSlots.length) {
       this.lastArrivalSlots=revealSlots;
       this.arrival.begin(revealSlots,{reducedMotion:this.reducedMotion.matches});
@@ -405,16 +367,18 @@ class GroupPortrait {
 
   prepareContribution(slot,replay=false) {
     const patch=planPatchAssignments(this.records)[slot],record=this.records[patch?.recordIndex];
-    this.contribution.show({image:record&&this.photoCache.get(photoKey(record)),slot,head:this.head,location:`画面${REGION_NAMES[slot]}`,replay});
+    if(record)this.sources.select(record.id);
+    this.contribution.show({image:record&&this.photoCache.get(photoKey(record)),slot,head:this.head,location:`${sourceLabel(record,this.records.indexOf(record))} · 画面${REGION_NAMES[slot]}`,replay});
   }
 
-  replayContribution() {
-    const record=[...this.records].reverse().find(record=>this.photoCache.has(photoKey(record)));
+  replayContribution(id) {
+    const record=[...this.records].reverse().find(record=>(!id||record.id===id)&&this.photoCache.has(photoKey(record)));
     if(!record||!this.ready)return;
     this.snapshotAppearance();this.lastArrivalSlots=[record.slot];this.resetView();
     this.arrival.begin([record.slot],{reducedMotion:this.reducedMotion.matches});this.paintArrivalMask([record.slot]);
     // Replay is a guide only: both atlases hold the already settled face.
     this.fromContext.clearRect(0,0,SIZE,SIZE);this.fromContext.drawImage(this.atlas,0,0);this.fromTexture.needsUpdate=true;
+    this.fromCoverageContext.clearRect(0,0,SIZE,SIZE);this.fromCoverageContext.drawImage(this.coverage,0,0);this.fromCoverageTexture.needsUpdate=true;
     this.prepareContribution(record.slot,true);this.syncArrivalDisplay(this.arrival.snapshot());
     $('portrait-workspace').scrollIntoView({behavior:'instant',block:'center'});
   }
@@ -446,6 +410,7 @@ class GroupPortrait {
     // evicted/deleted photos immediately, including their backing pixel stores.
     for(const [key,photo] of this.photoCache)if(!keys.has(key)) {
       photo.width=photo.height=1;this.photoCache.delete(key);
+      const source=this.sourceCache.get(key);if(source)source.width=source.height=1;this.sourceCache.delete(key);
     }
     const missing=records.filter(record=>!this.photoCache.has(photoKey(record)));
     this.loadingPhotos=missing.length>0;
@@ -468,7 +433,8 @@ class GroupPortrait {
       try {
         const aligned=createAlignedPhoto(image,missing[i].photo_anchors,{size:SIZE,...this.projection,baseColor:BASE_COLOR});
         this.photoCache.set(photoKey(missing[i]),aligned);
-      } catch { /* Only this participant falls back to its seed fragment. */ }
+        this.sourceCache.set(photoKey(missing[i]),createSourceThumbnail(image,missing[i].photo_anchors));
+      } catch { /* Only this participant stays blank. */ }
       finally {image.close();}
     }
     this.repaintPhotos();this.loadingPhotos=false;this.updateStatus();
@@ -497,7 +463,7 @@ class GroupPortrait {
       mesh.morphTargetInfluences[index]+=step;
     }
     if(this.head) this.stage.dataset.jawOpen=(this.head.morphTargetInfluences[this.head.morphTargetDictionary.jawOpen]||0).toFixed(3);
-    this.photoUniform.value+=((this.loadedCount||this.seedAtlas?1:0)-this.photoUniform.value)*alpha;
+    this.photoUniform.value+=((this.loadedCount?1:0)-this.photoUniform.value)*alpha;
     // A gentle oscillation keeps the open sculptural mask facing the viewer.
     this.controls.autoRotate=false;
     if(this.model) {
@@ -517,11 +483,13 @@ class GroupPortrait {
   }
 
   dispose() {
-    this.disposed=true;++this.generation;this.abort?.abort();this.seedAbort?.abort();
+    this.disposed=true;++this.generation;this.abort?.abort();
     for(const photo of this.photoCache.values())photo.width=photo.height=1;
-    this.photoCache.clear();if(this.seedAtlas)this.seedAtlas.width=this.seedAtlas.height=1;cancelAnimationFrame(this.frameId);
+    this.photoCache.clear();for(const source of this.sourceCache.values())source.width=source.height=1;this.sourceCache.clear();this.sources.dispose();cancelAnimationFrame(this.frameId);
     clearTimeout(this.photoRetryTimer);
     this.arrival.clear();this.contribution.dispose();this.fromTexture.dispose();this.arrivalMaskTexture.dispose();
+    this.coverageTexture.dispose();this.fromCoverageTexture.dispose();
+    this.coverage.width=this.coverage.height=this.fromCoverage.width=this.fromCoverage.height=1;
     this.fromAtlas.width=this.fromAtlas.height=this.arrivalMask.width=this.arrivalMask.height=1;
     this.resizeObserver.disconnect();this.controls.dispose();this.texture.dispose();this.clearAtlas();
     this.scene.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});this.renderer.dispose();

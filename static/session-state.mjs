@@ -1,4 +1,5 @@
-import {fragmentSlot} from './portrait-math.mjs?v=20261027-fragments';
+import {PORTRAIT_REGION_COUNT} from './portrait-regions.mjs?v=20261028-real';
+import {fragmentSlot} from './portrait-math.mjs?v=20261028-real';
 
 export const EMOTION_KEYS = ['happiness','neutral','sadness','surprise','anger','fear','disgust','contempt'];
 export function normalizedScores(scores) {
@@ -8,11 +9,11 @@ export function normalizedScores(scores) {
   return Object.fromEntries(EMOTION_KEYS.map((key,i)=>[key,values[i]/max/sum]));
 }
 export class LocalSession {
-  constructor({limit=20,onRelease=()=>{}}={}) {this.limit=Math.max(1,Math.min(20,Math.floor(limit)||20));this.onRelease=onRelease;this.records=[];this.sequence=0;}
+  constructor({limit=PORTRAIT_REGION_COUNT,onRelease=()=>{}}={}) {this.limit=Math.max(1,Math.min(PORTRAIT_REGION_COUNT,Math.floor(limit)||PORTRAIT_REGION_COUNT));this.onRelease=onRelease;this.records=[];this.sequence=0;}
   add({scores,photoUrl,anchors,time=new Date().toISOString()}) {
     const normalized=normalizedScores(scores);
     if(!normalized || typeof photoUrl!=='string' || !photoUrl.startsWith('blob:')) throw new Error('需要有效的表情结果和浏览器本地照片。');
-    const record={id:crypto.randomUUID(),time,scores:normalized,emotion:EMOTION_KEYS.reduce((a,b)=>normalized[a]>=normalized[b]?a:b),image_url:photoUrl,photo_anchors:structuredClone(anchors||{}),slot:fragmentSlot(this.sequence++)};
+    const record={id:crypto.randomUUID(),time,scores:normalized,emotion:EMOTION_KEYS.reduce((a,b)=>normalized[a]>=normalized[b]?a:b),image_url:photoUrl,photo_anchors:structuredClone(anchors||{}),slot:fragmentSlot(this.sequence++),number:this.sequence};
     this.records.push(record);
     while(this.records.length>this.limit) this.onRelease(this.records.shift().image_url);
     return record.id;

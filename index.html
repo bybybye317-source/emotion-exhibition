@@ -9,12 +9,12 @@
   <link rel="icon" href="data:,">
   <title>群体肖像 · 机器如何理解人类的情绪</title>
   <link rel="stylesheet" href="./static/style.css?v=20261027-emotions">
-  <link rel="stylesheet" href="./static/gallery-theme.css?v=20261028-anatomy">
+  <link rel="stylesheet" href="./static/gallery-theme.css?v=20261028-real">
   <link rel="stylesheet" href="./static/scent-instrument.css?v=20261028-flow">
   <link rel="stylesheet" href="./static/scent-atelier.css?v=20261028-flow">
   <script type="importmap">{"imports":{"three":"./static/vendor/three/three.module.js","three/addons/":"./static/vendor/three/addons/"}}</script>
-  <script type="module" src="./static/app.js?v=20261028-anatomy"></script>
-  <script type="module" src="./static/portrait.js?v=20261028-light"></script>
+  <script type="module" src="./static/app.js?v=20261028-real"></script>
+  <script type="module" src="./static/portrait.js?v=20261028-real"></script>
   <script type="module" src="./static/music.js?v=20261028-fast"></script>
   <script type="module" src="./static/scent.js?v=20261028-fast"></script>
 </head>
@@ -142,11 +142,19 @@
         </div>
         <aside class="portrait-rail" aria-label="作品状态">
           <p id="portrait-count" class="portrait-count">0 位观众</p>
-          <h3 id="portrait-status" class="portrait-status" role="status">正在拼合初始面孔…</h3>
+          <h3 id="portrait-status" class="portrait-status" role="status">正在准备空白模型…</h3>
           <button id="portrait-retry-model" class="button secondary compact" type="button" hidden>重试三维肖像</button>
-          <button id="portrait-retry-seeds" class="button secondary compact" type="button" hidden>重试初始面孔</button>
-          <p id="portrait-empty-hint" class="portrait-description">20 张虚构面孔，各取一部分，拼成一张共同的脸。每位观众加入时，只替换其中一块。</p>
+          <p id="portrait-empty-hint" class="portrait-description">32 处细分区域，等待真实观众填入。没有照片的位置保留素色模型。</p>
           <button id="portrait-show-piece" class="button subtle compact portrait-show-piece" type="button" disabled>查看我的片段 <span aria-hidden="true">↗</span></button>
+          <section id="portrait-sources" class="portrait-sources" aria-label="观众与贡献位置" hidden>
+            <h3>每一块，来自谁</h3>
+            <p>点击一张照片，定位他贡献的片段。</p>
+            <div id="portrait-source-list" class="portrait-source-list" aria-label="本轮观众照片"></div>
+            <div id="portrait-source-reference" class="portrait-source-reference" hidden>
+              <canvas id="portrait-source-photo" width="160" height="196" role="img" aria-label="当前观众的原始照片局部"></canvas>
+              <div><strong id="portrait-source-name"></strong><span id="portrait-source-location"></span><small>原始照片局部 · 仅留在本次浏览</small></div>
+            </div>
+          </section>
           <section class="portrait-distribution" aria-labelledby="portrait-emotions-title">
             <h3 id="portrait-emotions-title">群体表情</h3>
             <div id="portrait-emotions" class="scores compact-scores"><p class="portrait-no-data">暂无数据<br><span>当有观众完成采集后，将分析并展示群体的表情倾向。</span></p></div>

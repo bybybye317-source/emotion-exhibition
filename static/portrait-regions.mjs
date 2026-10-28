@@ -1,4 +1,4 @@
-// Twenty fixed anatomical patches. Every curved seam is built once and used
+// Anatomical patches. Every curved seam is built once and used
 // in reverse by its neighbour, including the outline of the complete lips.
 const N={
  A0:[0,0],A1:[.37,0],A2:[.63,0],A3:[1,0],
@@ -46,7 +46,41 @@ function buildCells(){
   return directed.slice(0,-1).map(p=>p.slice());
  }));
 }
+const rounded=p=>p.map(v=>Math.round(v*1e12)/1e12);
+const same=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1])<1e-10;
+function splitRegion(cells,slot,slope){
+ const cell=cells[slot],xs=cell.map(p=>p[0]),ys=cell.map(p=>p[1]);
+ const cx=(Math.min(...xs)+Math.max(...xs))/2,cy=(Math.min(...ys)+Math.max(...ys))/2;
+ const side=p=>p[1]-cy-slope*(p[0]-cx),cuts=[];
+ for(let i=0;i<cell.length;i++){
+  const a=cell[i],b=cell[(i+1)%cell.length],u=side(a),v=side(b);
+  if(u*v<0){const t=u/(u-v);cuts.push(rounded(a.map((n,k)=>n+t*(b[k]-n))));}
+ }
+ if(cuts.length!==2)throw new Error('Anatomical split must have two boundary crossings');
+ // Insert the same endpoints into both neighbouring masks before splitting.
+ for(let n=0;n<cells.length;n++)cells[n]=cells[n].flatMap((a,i,polygon)=>{
+  const b=polygon[(i+1)%polygon.length],dx=b[0]-a[0],dy=b[1]-a[1],length=dx*dx+dy*dy;
+  const on=cuts.filter(p=>!same(p,a)&&!same(p,b)&&Math.abs(dx*(p[1]-a[1])-dy*(p[0]-a[0]))<1e-11
+    &&(p[0]-a[0])*dx+(p[1]-a[1])*dy>0&&(p[0]-a[0])*dx+(p[1]-a[1])*dy<length);
+  on.sort((p,q)=>(p[0]-q[0])*dx+(p[1]-q[1])*dy);return [a,...on];
+ });
+ const polygon=cells[slot],a=polygon.findIndex(p=>same(p,cuts[0])),b=polygon.findIndex(p=>same(p,cuts[1]));
+ const [start,end]=[Math.min(a,b),Math.max(a,b)],p=polygon[start],q=polygon[end];
+ const length=Math.hypot(q[0]-p[0],q[1]-p[1]),steps=Math.max(3,Math.ceil(length/.009));
+ const seam=Array.from({length:steps+1},(_,i)=>{
+  if(!i)return p;if(i===steps)return q;
+  const t=i/steps,bend=Math.sin(Math.PI*t)*Math.min(.005,length*.025);
+  return rounded([p[0]+(q[0]-p[0])*t-(q[1]-p[1])/length*bend,p[1]+(q[1]-p[1])*t+(q[0]-p[0])/length*bend]);
+ });
+ cells[slot]=[...polygon.slice(start,end+1),...seam.slice(1,-1).reverse()];
+ cells.push([...polygon.slice(end),...polygon.slice(0,start+1),...seam.slice(1,-1)]);
+}
 const CELLS=buildCells();
+// Keep complete eyes/brows, nose and lips. Smaller skin fragments surround
+// these recognisable features rather than cutting an iris or lip in half.
+for(const [slot,slope] of [[0,.22],[1,-.25],[2,-.18],[3,.3],[6,-.3],[7,-.25],[8,.25],[10,-.25],[11,.25],[12,.2],[16,-.2],[18,.18]])splitRegion(CELLS,slot,slope);
+export const PORTRAIT_REGION_COUNT=CELLS.length;
+export const REGION_NAMES=Object.freeze(['左侧额头上部','额头中央上部','右侧额头上部','左侧太阳穴上部','左侧眉眼','右侧眉眼','右侧太阳穴上部','左侧颧骨外缘','左侧上颊','鼻梁与鼻翼','右侧上颊','右侧颧骨外缘','左侧下颊上部','左侧嘴角','完整唇部','右侧嘴角','右侧下颊上部','左侧下颌','下巴上部','右侧下颌','左侧额头下部','额头中央下部','右侧额头下部','左侧太阳穴下部','右侧太阳穴下部','左侧面颊外缘','左侧下颊','右侧下颊','右侧面颊外缘','左侧下颊下部','右侧下颊下部','下巴下部']);
 export const anatomicalFragmentCells=()=>CELLS.map(cell=>cell.map(p=>p.slice()));
 export function fragmentBounds(slot){
  const cell=CELLS[slot];if(!cell)return null;

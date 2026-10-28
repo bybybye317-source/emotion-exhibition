@@ -68,7 +68,9 @@ export function refineFeatureWarp(base,anchors,target,width,height){
    const t=[match.tri[i],match.tri[(i+1)%3],index];
    if(area(warp.target[t[0]],warp.target[t[1]],dst)>1e-7)newTriangles.push(t);
   }
-  warp.source.push(source);warp.target.push(dst.slice());wanted.set(index,desired);
+  // Keep some native eyelid/brow proportions instead of forcing every
+  // photographed feature into exactly the same template.
+  warp.source.push(source);warp.target.push(dst.slice());wanted.set(index,desired.map((v,k)=>source[k]+(v-source[k])*.65));
   const removed=new Set(matches.map(m=>m.i)),replacement=[];
   for(let i=0;i<warp.triangles.length;i++){
    if(i===matches[0].i)replacement.push(...newTriangles);

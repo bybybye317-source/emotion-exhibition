@@ -1,11 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {exposureGain, photoWarpGeometry} from '../static/portrait-collage.mjs';
+import {photoWarpGeometry} from '../static/portrait-collage.mjs';
 import {affineFromTriangles} from '../static/portrait-math.mjs';
-
-test('photo correction keeps ordinary exposures and skin differences intact',()=>{
-  for(const level of [135,150,180,210,235]) assert.equal(exposureGain(level),1);
-});
 
 const source={left_eye:[.30,.35],right_eye:[.70,.35],nose:[.50,.55],mouth:[.50,.75],
   mouth_left:[.32,.72],mouth_right:[.68,.72],mouth_upper_outer:[.50,.66],mouth_upper_inner:[.50,.70],mouth_lower_inner:[.50,.80],mouth_lower_outer:[.50,.84]};
@@ -81,13 +77,4 @@ test('closed source contours stay finite and missing contours retain the six-poi
   }
   const fallback=photoWarpGeometry({...contourSource,mouth_upper_contour:[]},1000,1000,target,1024);
   assert.equal(fallback.denseMouth,true);assert.equal(fallback.contourMouth,undefined);assert.equal(fallback.triangles.length,20);
-});
-
-test('exposure correction gently lifts shadows and lowers extreme highlights',()=>{
-  assert(exposureGain(90)>1 && exposureGain(90)<=1.14);
-  assert(exposureGain(250)<1 && exposureGain(250)>=.90);
-  assert.equal(exposureGain(1),1.14);
-  assert.equal(exposureGain(Infinity),1);
-  assert.equal(exposureGain(NaN),1);
-  assert.equal(exposureGain(0),1);
 });

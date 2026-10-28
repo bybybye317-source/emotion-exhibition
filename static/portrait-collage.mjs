@@ -1,8 +1,8 @@
+import {balancePhotoLighting} from './portrait-lighting.mjs?v=20261028-light';
 import {refineFeatureWarp} from './portrait-features.mjs?v=20261028-anatomy';
 import {affineFromTriangles, photoTriangle, organicFragmentCells, planPatchAssignments} from './portrait-math.mjs?v=20261028-anatomy';
 
 const DEFAULT_COLOR = '#aaa69e';
-const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const makeCanvas = size => Object.assign(document.createElement('canvas'), {width:size, height:size});
 const validPoint = point => Array.isArray(point) && point.length === 2 && point.every(Number.isFinite);
 const MOUTH_KEYS = ['mouth_left','mouth_right','mouth_upper_outer','mouth_upper_inner','mouth_lower_inner','mouth_lower_outer'];
@@ -139,39 +139,10 @@ function polygon(ctx, points, expansion = 0) {
   ctx.closePath();
 }
 
-// Only nudge obvious under/over-exposure. A single common mean would erase
-// differences between people's skin; the broad untouched band avoids that.
-export function exposureGain(upperLuminance) {
-  if(!Number.isFinite(upperLuminance) || upperLuminance <= 0) return 1;
-  if(upperLuminance < 135) return clamp(Math.sqrt(135/upperLuminance),1,1.14);
-  if(upperLuminance > 235) return clamp(Math.sqrt(235/upperLuminance),.90,1);
-  return 1;
-}
-
-function normalizeExposure(output, target) {
-  const ctx=output.getContext('2d',{willReadFrequently:true}), size=output.width;
-  const pixels=ctx.getImageData(0,0,size,size), data=pixels.data;
-  const left=clamp(Math.floor(target.left_eye[0]-.13*size),0,size-1);
-  const right=clamp(Math.ceil(target.right_eye[0]+.13*size),left+1,size);
-  const top=clamp(Math.floor(target.left_eye[1]-.12*size),0,size-1);
-  const bottom=clamp(Math.ceil(target.mouth[1]+.10*size),top+1,size);
-  const histogram=new Uint32Array(256); let count=0;
-  for(let y=top;y<bottom;y+=4) for(let x=left;x<right;x+=4) {
-    const i=(y*size+x)*4;
-    if(data[i+3]<200) continue;
-    const luma=Math.round(.2126*data[i]+.7152*data[i+1]+.0722*data[i+2]);
-    histogram[luma]++;count++;
-  }
-  let cumulative=0, upper=128;
-  for(let i=0;i<256;i++) {cumulative+=histogram[i];if(cumulative>=count*.85){upper=i;break;}}
-  const gain=exposureGain(upper);
-  for(let i=0;i<data.length;i+=4) {
-    // Preserve the person's original skin colour and local texture; only
-    // guard extreme exposure, without pulling all fragments toward grey.
-    for(let channel=0;channel<3;channel++) {
-      data[i+channel]=clamp(data[i+channel]*gain,0,255);
-    }
-  }
+function normalizeLighting(output, target) {
+  const ctx=output.getContext('2d',{willReadFrequently:true});
+  const pixels=ctx.getImageData(0,0,output.width,output.height);
+  balancePhotoLighting(pixels.data,output.width,output.height,target);
   ctx.putImageData(pixels,0,0);
 }
 
@@ -207,7 +178,7 @@ export function createAlignedPhoto(image, anchors, {size=1024,bounds,landmarks,b
       ctx.setTransform(...matrix);ctx.drawImage(image,0,0);ctx.restore();
     }
   }
-  normalizeExposure(output,target);
+  normalizeLighting(output,target);
   return output;
 }
 

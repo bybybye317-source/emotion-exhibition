@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {createAlignedPhoto, paintCollage} from './portrait-collage.mjs?v=20261028-anatomy';
+import {createAlignedPhoto, paintCollage} from './portrait-collage.mjs?v=20261028-light';
 import {ARRIVAL_SECONDS, FragmentArrival, blendLinearPixels} from './portrait-arrival.mjs?v=20261028-anatomy';
 import {LABELS, morphWeights, normalizeScores, organicFragmentCells, planPatchAssignments} from './portrait-math.mjs?v=20261028-anatomy';
 
@@ -59,8 +59,8 @@ class GroupPortrait {
     this.controls.minPolarAngle=1.12;this.controls.maxPolarAngle=1.97;
     this.controls.minAzimuthAngle=-.85;this.controls.maxAzimuthAngle=.85;
     this.controls.autoRotateSpeed=.30;
-    this.scene.add(new THREE.HemisphereLight(0xe8e5de,0x151922,.32));
-    for(const [color,intensity,position] of [[0xf1ede4,2.9,[-4,3,4]],[0xbecddd,.48,[3,.5,3]],[0xdce7f4,2.2,[3,2,-2]]]) {
+    this.scene.add(new THREE.HemisphereLight(0xe8e5de,0x1c1a19,.55));
+    for(const [color,intensity,position] of [[0xf1ede4,2.4,[-3,3,5]],[0xe4e6e8,.85,[3,.5,4]],[0xe8e4df,.60,[3,2,-2]]]) {
       const light=new THREE.DirectionalLight(color,intensity);light.position.set(...position);this.scene.add(light);
     }
     this.resetView();
@@ -126,7 +126,7 @@ class GroupPortrait {
   }
 
   sculptureMaterial(eyeCenter=null) {
-    const material=new THREE.MeshStandardMaterial({color:0xffffff,map:this.texture,roughness:.72,metalness:.035,side:THREE.DoubleSide});
+    const material=new THREE.MeshStandardMaterial({color:0xffffff,map:this.texture,roughness:.82,metalness:0,side:THREE.DoubleSide});
     material.onBeforeCompile=shader=>{
       shader.uniforms.portraitPhotoMix=this.photoUniform;
       shader.uniforms.portraitPreviousMap={value:this.fromTexture};
@@ -140,6 +140,19 @@ class GroupPortrait {
       shader.fragmentShader='uniform sampler2D portraitPreviousMap;\nuniform sampler2D portraitArrivalMask;\nuniform float portraitArrivalMix;\nuniform float portraitArrivalGlow;\nuniform vec3 portraitEyeCenter;\nuniform float portraitPhotoMix;\nuniform vec3 portraitBaseColor;\nvarying float vPortraitWeight;\nvarying vec3 vSculpturePosition;\n'+shader.fragmentShader;
       shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',`
         vec3 photograph = mix(texture2D(portraitPreviousMap, vMapUv).rgb, texture2D(map, vMapUv).rgb, portraitArrivalMix);
+        // Continue nearby skin over the outer mask instead of revealing a
+        // grey rim. Sample inside the face so hair/background cannot stretch
+        // across the silhouette; the same arrival mix keeps joins continuous.
+        vec2 edgeUv = clamp(vMapUv, vec2(0.17, 0.13), vec2(0.83, 0.85));
+        // Coarser mip levels carry colour, not stretched eyebrows or pores,
+        // around the side of the mask when the viewer rotates it.
+        float edgeLod = mix(7.0, 3.0, vPortraitWeight);
+        vec3 edgeSkin = mix(
+          textureLod(portraitPreviousMap, edgeUv, edgeLod).rgb,
+          textureLod(map, edgeUv, edgeLod).rgb,
+          portraitArrivalMix
+        );
+        vec3 surface = mix(edgeSkin * 0.72, photograph, vPortraitWeight);
         // Quiet mineral variation, evaluated in object space so it stays on the sculpture.
         float grain = fract(sin(dot(floor(vSculpturePosition * 380.0), vec3(12.9898,78.233,39.425))) * 43758.5453);
         vec3 stone = portraitBaseColor * (0.975 + grain * 0.05);
@@ -147,7 +160,7 @@ class GroupPortrait {
         float iris = 1.0-smoothstep(0.050,0.060,eyeRadius);
         float pupil = 1.0-smoothstep(0.018,0.026,eyeRadius);
         stone *= 1.0 - iris*0.24 - pupil*0.32;
-        diffuseColor.rgb *= mix(stone, photograph, vPortraitWeight * portraitPhotoMix * 0.98);
+        diffuseColor.rgb *= mix(stone, surface, portraitPhotoMix);
       `);
       shader.fragmentShader=shader.fragmentShader.replace('#include <emissivemap_fragment>', `
         #include <emissivemap_fragment>
@@ -156,7 +169,7 @@ class GroupPortrait {
         totalEmissiveRadiance += vec3(0.95, 0.72, 0.40) * arrivalLight * portraitArrivalGlow * vPortraitWeight;
       `);
     };
-    material.customProgramCacheKey=()=> 'sculpted-portrait-collage-v5';
+    material.customProgramCacheKey=()=> 'sculpted-portrait-collage-v6';
     return material;
   }
 

@@ -7,7 +7,7 @@ const person=sequence=>({id:`visitor-${sequence}`,slot:fragmentSlot(sequence)});
 const owners=records=>planPatchAssignments(records).map(patch=>patch.participantId);
 const changedSlots=(before,after)=>before.flatMap((id,index)=>id===after[index]?[]:[index]);
 
-test('empty face is a complete set of 32 unoccupied regions',()=>{
+test('empty face is a complete set of 32 unoccupied ownership groups',()=>{
   const patches=planPatchAssignments([]);
   assert.equal(patches.length,32);
   assert.deepEqual(patches.map(patch=>patch.slot),Array.from({length:32},(_,i)=>i));
@@ -15,7 +15,7 @@ test('empty face is a complete set of 32 unoccupied regions',()=>{
   assert(PATCH_SEEDS.every(([x,y])=>x>=.2 && x<=.8 && y>=.1 && y<=.9));
 });
 
-test('each arriving participant changes exactly one region without moving earlier fragments',()=>{
+test('each arriving participant changes exactly one ownership group without moving earlier fragments',()=>{
   const records=[];
   for(let sequence=0;sequence<32;sequence++) {
     const before=owners(records);
@@ -25,10 +25,10 @@ test('each arriving participant changes exactly one region without moving earlie
     for(const record of records) assert.equal(after.filter(id=>id===record.id).length,1);
   }
   assert.equal(new Set(records.map(record=>record.slot)).size,32);
-  assert.equal(fragmentSlot(0),4,'first visitor contributes the visible left eye region');
+  assert.equal(fragmentSlot(0),4,'first visitor receives the stable initial ownership slot');
 });
 
-test('rolling 32-person capacity replaces only the oldest fragment for multiple cycles',()=>{
+test('rolling 32-person capacity replaces only the oldest ownership group for multiple cycles',()=>{
   const records=Array.from({length:32},(_,sequence)=>person(sequence));
   for(let sequence=32;sequence<65;sequence++) {
     const before=owners(records), removed=records.shift(), added=person(sequence);
@@ -91,7 +91,7 @@ function paintedSources(photos,records,seeds) {
   return draws;
 }
 
-test('one live portrait is painted once and empty regions stay unfilled',()=>{
+test('one live portrait is composited once through its six-piece mask; empty groups stay unfilled',()=>{
   const record=person(0);
   assert.deepEqual(paintedSources([{sourceLabel:'live-A'}],[record],[]),['live-A']);
   assert.deepEqual(paintedSources([],[],[{sourceLabel:'forbidden-seed'}]),[]);

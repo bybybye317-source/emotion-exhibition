@@ -12,11 +12,13 @@
   <link rel="stylesheet" href="./static/gallery-theme.css?v=20261028-real">
   <link rel="stylesheet" href="./static/scent-instrument.css?v=20261028-flow">
   <link rel="stylesheet" href="./static/scent-atelier.css?v=20261028-flow">
+  <link rel="stylesheet" href="./static/exhibition.css?v=20261028-gallery192">
   <script type="importmap">{"imports":{"three":"./static/vendor/three/three.module.js","three/addons/":"./static/vendor/three/addons/"}}</script>
-  <script type="module" src="./static/app.js?v=20261028-real"></script>
-  <script type="module" src="./static/portrait.js?v=20261028-real"></script>
-  <script type="module" src="./static/music.js?v=20261028-fast"></script>
-  <script type="module" src="./static/scent.js?v=20261028-fast"></script>
+  <script type="module" src="./static/app.js?v=20261028-gallery192"></script>
+  <script type="module" src="./static/portrait.js?v=20261028-gallery192"></script>
+  <script type="module" src="./static/music.js?v=20261028-gallery192"></script>
+  <script type="module" src="./static/scent.js?v=20261028-gallery192"></script>
+  <script type="module" src="./static/exhibition.mjs?v=20261028-gallery192"></script>
 </head>
 <body>
   <svg class="svg-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -36,22 +38,25 @@
 
   <main class="app-shell">
     <header class="page-header">
-      <div class="identity"><h1 id="page-title">群体肖像</h1><p class="project-title">机器如何理解人类的情绪</p></div>
-      <nav class="view-tabs" role="tablist" aria-label="三感官体验与参与">
+      <div class="identity"><h1 id="page-title">共感展厅</h1><p class="project-title">机器如何理解人类的情绪</p></div>
+      <nav class="view-tabs" role="tablist" aria-label="展厅与感官视图">
+        <button id="nav-gallery" class="view-tab" type="button" role="tab" aria-selected="true" aria-controls="gallery-panel">综合展厅</button>
         <button id="nav-portrait" class="view-tab" type="button" role="tab" aria-selected="true" aria-controls="portrait-panel">视觉</button>
         <button id="nav-music" class="view-tab" type="button" role="tab" aria-selected="false" aria-controls="music-panel" tabindex="-1">听觉</button>
         <button id="nav-scent" class="view-tab" type="button" role="tab" aria-selected="false" aria-controls="scent-panel" tabindex="-1">嗅觉</button>
         <button id="nav-capture" class="view-tab" type="button" role="tab" aria-selected="false" aria-controls="capture-panel" tabindex="-1">参与作品</button>
       </nav>
+      <div class="gallery-header-actions"><button id="music-toggle" class="button primary music-toggle" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#icon-play"></use></svg><span id="music-toggle-label">开启声音</span></button><button id="gallery-fullscreen" class="button compact" type="button"><svg class="icon" aria-hidden="true"><use href="#icon-fullscreen"></use></svg><span>全屏展厅</span></button></div>
       <div id="connection" class="connection" role="status"><span class="status-dot"></span><span id="connection-text">正在连接</span></div>
     </header>
 
 
-    <section class="web-intro" aria-label="在线体验说明"><p><strong>一种情绪，三种感官。</strong>先选择情绪体验，也可以用摄像头或照片加入自己的群体作品。</p><p class="web-privacy">照片和表情分析仅在你的浏览器内处理，不上传；本轮记录刷新后清空，不与其他访客共享。首次启用识别需要下载模型。</p>      <details class="artwork-preview-details" open>
-        <summary><span>联动预览</span><svg class="icon" aria-hidden="true"><use href="#icon-chevron"></use></svg></summary>
-        <div class="artwork-preview-body">
-          <label for="artwork-preview">情绪联动预览</label>
-          <select id="artwork-preview">
+    <div id="action-error" class="message error" role="alert" hidden></div>
+
+    <section id="gallery-emotions" class="gallery-emotions" aria-label="共享群体情绪">
+      <div class="gallery-emotion-title"><h2 id="gallery-emotion-heading">群体情绪</h2><span id="gallery-count">0 位观众</span></div>
+      <div id="gallery-spectrum" class="gallery-spectrum" aria-label="八类群体表情占比"></div>
+      <div class="gallery-preview"><label for="artwork-preview">联动预览</label><select id="artwork-preview">
             <option value="group">跟随群体</option>
             <option value="neutral">中性</option>
             <option value="happiness">快乐</option>
@@ -61,15 +66,74 @@
             <option value="fear">恐惧</option>
             <option value="disgust">厌恶</option>
             <option value="contempt">轻蔑</option>
-          </select>
-          <p>每种情绪先试听 10–15 秒，感受音色与形态的变化；预览不写入观众记录。</p>
+          </select></div>
+      <p id="gallery-emotion-note">等待第一位观众 · 三种感官共享本轮数据</p>
+    </section>
+    <div id="gallery-panel" class="gallery-panels" role="region" aria-label="三感官综合展厅">
+    <section id="portrait-panel" class="view-panel" role="tabpanel" aria-labelledby="nav-portrait">
+      <div class="module-heading"><div><h2>群体肖像</h2><span>192 个碎片 · 每人 6 片</span></div><button class="module-expand" data-focus-view="portrait" aria-label="放大群体肖像">放大 <span aria-hidden="true">↗</span></button></div>
+      <div class="portrait-layout">
+        <div id="portrait-workspace" class="portrait-workspace">
+          <div id="portrait-stage" class="portrait-stage" aria-label="由观众照片组成的三维群体肖像" aria-describedby="portrait-controls-hint"></div>
+          <div id="portrait-piece-card" class="portrait-piece-card" aria-hidden="true" hidden>
+            <span id="portrait-piece-title">这是你贡献的片段</span>
+            <div id="portrait-piece-image" class="portrait-piece-image"></div>
+            <strong id="portrait-piece-location"></strong>
+          </div>
+          <svg id="portrait-piece-guide" class="portrait-piece-guide" aria-hidden="true" hidden><path id="portrait-piece-line"/><circle id="portrait-piece-dot" r="3"/></svg>
+          <div id="portrait-arrival-note" class="portrait-arrival-note" aria-hidden="true" hidden><span>你的片段正在融入</span><strong id="portrait-arrival-location"></strong></div>
+          <div class="portrait-toolbar">
+            <p id="portrait-controls-hint" class="portrait-controls-hint"><svg class="icon" aria-hidden="true"><use href="#icon-pointer"></use></svg><span>拖动旋转 · 滚轮缩放</span></p>
+            <div class="portrait-actions">
+              <button id="portrait-reset-view" class="button compact portrait-control" type="button"><svg class="icon" aria-hidden="true"><use href="#icon-reset-view"></use></svg><span>重置视角</span></button>
+              <button id="portrait-rotate" class="button compact portrait-control" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#icon-play"></use></svg><span>自动旋转</span></button>
+              <button id="portrait-fullscreen" class="button compact portrait-control" type="button"><svg class="icon" aria-hidden="true"><use href="#icon-fullscreen"></use></svg><span>全屏</span></button>
+            </div>
+          </div>
         </div>
-      </details>
+        <aside class="portrait-rail" aria-label="作品状态">
+          <p id="portrait-count" class="portrait-count">0 位观众</p>
+          <h3 id="portrait-status" class="portrait-status" role="status">正在准备空白模型…</h3>
+          <button id="portrait-retry-model" class="button secondary compact" type="button" hidden>重试三维肖像</button>
+          <p id="portrait-empty-hint" class="portrait-description">192 个小碎片，每位观众贡献 6 片。没有照片的位置保留素色模型。</p>
+          <button id="portrait-show-piece" class="button subtle compact portrait-show-piece" type="button" disabled>查看我的片段 <span aria-hidden="true">↗</span></button>
+          <section id="portrait-sources" class="portrait-sources" aria-label="观众与贡献位置" hidden>
+            <h3>每一块，来自谁</h3>
+            <p>点击一张照片，定位他贡献的 6 个碎片。</p>
+            <div id="portrait-source-list" class="portrait-source-list" aria-label="本轮观众照片"></div>
+            <div id="portrait-source-reference" class="portrait-source-reference" hidden>
+              <canvas id="portrait-source-photo" width="160" height="196" role="img" aria-label="当前观众的原始照片局部"></canvas>
+              <div><strong id="portrait-source-name"></strong><span id="portrait-source-location"></span><small>原始照片局部 · 仅留在本次浏览</small></div>
+            </div>
+          </section>
+          <section class="portrait-distribution" aria-labelledby="portrait-emotions-title">
+            <h3 id="portrait-emotions-title">群体表情</h3>
+            <div id="portrait-emotions" class="scores compact-scores"><p class="portrait-no-data">暂无数据<br><span>当有观众完成采集后，将分析并展示群体的表情倾向。</span></p></div>
+          </section>
+          <details class="portrait-preview-details">
+            <summary><span>联动预览</span><svg class="icon" aria-hidden="true"><use href="#icon-chevron"></use></svg></summary>
+            <div class="portrait-preview-body">
+              <label for="portrait-preview">预览脸、音乐和气味</label>
+              <select id="portrait-preview">
+                <option value="group">跟随群体</option>
+                <option value="neutral">中性</option>
+                <option value="happiness">快乐</option>
+                <option value="sadness">悲伤</option>
+                <option value="surprise">惊讶</option>
+                <option value="anger">愤怒</option>
+                <option value="fear">恐惧</option>
+                <option value="disgust">厌恶</option>
+                <option value="contempt">轻蔑</option>
+              </select>
+              <p>预览同时改变脸、音乐和气味，不写入观众记录。选择“跟随群体”恢复实时作品。</p>
+            </div>
+          </details>
+        </aside>
+      </div>
     </section>
 
-    <div id="action-error" class="message error" role="alert" hidden></div>
-
     <section id="music-panel" class="music-panel" role="tabpanel" aria-labelledby="nav-music" hidden>
+      <div class="module-heading"><div><h2>悬浮声场</h2><span>让声音与情绪，缓慢显形</span></div><button class="module-expand" data-focus-view="music" aria-label="放大悬浮声场">放大 <span aria-hidden="true">↗</span></button></div>
       <div class="music-emotion-choices" role="group" aria-label="四种情绪对比，也可回到群体">
         <button type="button" data-music-emotion="happiness" aria-pressed="false"><strong>快乐</strong><span>明亮 · 舒展</span></button>
         <button type="button" data-music-emotion="sadness" aria-pressed="false"><strong>悲伤</strong><span>深远 · 下垂</span></button>
@@ -104,7 +168,7 @@
           <div class="music-layer"><span>打击</span><div class="music-layer-track"><span id="music-percussion-fill" class="music-layer-fill"></span></div></div>
         </div>
         <div class="music-controls">
-          <button id="music-toggle" class="button primary music-toggle" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#icon-play"></use></svg><span id="music-toggle-label">开启声音</span></button>
+
           <div class="music-volume-control"><label for="music-volume">音量</label><input id="music-volume" type="range" min="0" max="100" value="35"><output id="music-volume-value" for="music-volume">35%</output></div>
         </div>
       </div>
@@ -119,131 +183,9 @@
       <div id="music-error" class="message error music-error" role="alert" hidden></div>
     </section>
 
-    <section id="portrait-panel" class="view-panel" role="tabpanel" aria-labelledby="nav-portrait">
-      <h2 class="portrait-heading">每一张面孔，都成为这张脸的一部分</h2>
-      <div class="portrait-layout">
-        <div id="portrait-workspace" class="portrait-workspace">
-          <div id="portrait-stage" class="portrait-stage" aria-label="由观众照片组成的三维群体肖像" aria-describedby="portrait-controls-hint"></div>
-          <div id="portrait-piece-card" class="portrait-piece-card" aria-hidden="true" hidden>
-            <span id="portrait-piece-title">这是你贡献的片段</span>
-            <div id="portrait-piece-image" class="portrait-piece-image"></div>
-            <strong id="portrait-piece-location"></strong>
-          </div>
-          <svg id="portrait-piece-guide" class="portrait-piece-guide" aria-hidden="true" hidden><path id="portrait-piece-line"/><circle id="portrait-piece-dot" r="3"/></svg>
-          <div id="portrait-arrival-note" class="portrait-arrival-note" aria-hidden="true" hidden><span>你的片段正在融入</span><strong id="portrait-arrival-location"></strong></div>
-          <div class="portrait-toolbar">
-            <p id="portrait-controls-hint" class="portrait-controls-hint"><svg class="icon" aria-hidden="true"><use href="#icon-pointer"></use></svg><span>拖动旋转 · 滚轮缩放</span></p>
-            <div class="portrait-actions">
-              <button id="portrait-reset-view" class="button compact portrait-control" type="button"><svg class="icon" aria-hidden="true"><use href="#icon-reset-view"></use></svg><span>重置视角</span></button>
-              <button id="portrait-rotate" class="button compact portrait-control" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#icon-play"></use></svg><span>自动旋转</span></button>
-              <button id="portrait-fullscreen" class="button compact portrait-control" type="button"><svg class="icon" aria-hidden="true"><use href="#icon-fullscreen"></use></svg><span>全屏</span></button>
-            </div>
-          </div>
-        </div>
-        <aside class="portrait-rail" aria-label="作品状态">
-          <p id="portrait-count" class="portrait-count">0 位观众</p>
-          <h3 id="portrait-status" class="portrait-status" role="status">正在准备空白模型…</h3>
-          <button id="portrait-retry-model" class="button secondary compact" type="button" hidden>重试三维肖像</button>
-          <p id="portrait-empty-hint" class="portrait-description">32 处细分区域，等待真实观众填入。没有照片的位置保留素色模型。</p>
-          <button id="portrait-show-piece" class="button subtle compact portrait-show-piece" type="button" disabled>查看我的片段 <span aria-hidden="true">↗</span></button>
-          <section id="portrait-sources" class="portrait-sources" aria-label="观众与贡献位置" hidden>
-            <h3>每一块，来自谁</h3>
-            <p>点击一张照片，定位他贡献的片段。</p>
-            <div id="portrait-source-list" class="portrait-source-list" aria-label="本轮观众照片"></div>
-            <div id="portrait-source-reference" class="portrait-source-reference" hidden>
-              <canvas id="portrait-source-photo" width="160" height="196" role="img" aria-label="当前观众的原始照片局部"></canvas>
-              <div><strong id="portrait-source-name"></strong><span id="portrait-source-location"></span><small>原始照片局部 · 仅留在本次浏览</small></div>
-            </div>
-          </section>
-          <section class="portrait-distribution" aria-labelledby="portrait-emotions-title">
-            <h3 id="portrait-emotions-title">群体表情</h3>
-            <div id="portrait-emotions" class="scores compact-scores"><p class="portrait-no-data">暂无数据<br><span>当有观众完成采集后，将分析并展示群体的表情倾向。</span></p></div>
-          </section>
-          <details class="portrait-preview-details">
-            <summary><span>联动预览</span><svg class="icon" aria-hidden="true"><use href="#icon-chevron"></use></svg></summary>
-            <div class="portrait-preview-body">
-              <label for="portrait-preview">预览脸、音乐和气味</label>
-              <select id="portrait-preview">
-                <option value="group">跟随群体</option>
-                <option value="neutral">中性</option>
-                <option value="happiness">快乐</option>
-                <option value="sadness">悲伤</option>
-                <option value="surprise">惊讶</option>
-                <option value="anger">愤怒</option>
-                <option value="fear">恐惧</option>
-                <option value="disgust">厌恶</option>
-                <option value="contempt">轻蔑</option>
-              </select>
-              <p>预览同时改变脸、音乐和气味，不写入观众记录。选择“跟随群体”恢复实时作品。</p>
-            </div>
-          </details>
-        </aside>
-      </div>
-    </section>
-
-    <section id="capture-panel" class="view-panel" role="tabpanel" aria-labelledby="nav-capture" hidden>
-    <div class="primary-grid">
-      <section class="camera-section" aria-label="摄像头采集">
-        <div class="preview">
-          <video id="camera-stream" class="camera-stream" aria-label="摄像头实时镜像预览" autoplay playsinline muted hidden></video>
-          <div id="camera-placeholder" class="camera-placeholder">
-            <svg class="icon camera-icon"><use href="#icon-camera"></use></svg>
-            <h2 id="camera-placeholder-title">摄像头尚未开启</h2>
-            <p id="camera-placeholder-detail">开启摄像头后，正对镜头开始采集</p>
-          </div>
-          <div id="preview-badge" class="preview-badge" hidden>等待有效人脸</div>
-        </div>
-        <div class="camera-actions">
-          <button id="start-camera" class="button primary" disabled><svg class="icon"><use href="#icon-camera"></use></svg><span>开启摄像头</span></button>
-          <button id="capture" class="button" disabled><svg class="icon"><use href="#icon-clock"></use></svg><span id="capture-label">采集 1.5 秒</span></button>
-          <button id="stop-camera" class="button subtle" disabled><svg class="icon"><use href="#icon-stop"></use></svg><span>停止摄像头</span></button>
-        </div>
-        <div class="camera-feedback">
-          <p id="capture-detail" role="status">开启摄像头后，采集一位观众的表情。</p>
-          <div id="capture-progress" class="capture-progress" role="progressbar" aria-label="采集进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><span id="capture-progress-fill"></span></div>
-        </div>
-      </section>
-
-      <section class="panel live-panel" aria-labelledby="live-title">
-        <div class="panel-header"><h2 id="live-title">实时表情倾向</h2><span id="top-emotion" class="top-emotion"></span></div>
-        <div id="live-scores" class="scores" aria-label="八类表情分数"></div>
-        <p id="live-detail" class="panel-note" role="status">等待开启摄像头</p>
-        <p id="performance" class="performance"></p>
-      </section>
-    </div>
-
-    <div class="session-grid">
-      <section class="panel records-panel" aria-labelledby="records-title">
-        <div class="panel-header"><div class="heading-with-count"><h2 id="records-title">本轮参与记录</h2><span id="participant-count" class="count">0 人</span></div><button id="reset-session" class="button compact subtle" disabled><svg class="icon"><use href="#icon-trash"></use></svg><span>清空本轮</span></button></div>
-        <div id="records-empty" class="empty-state"><svg class="icon empty-icon"><use href="#icon-record"></use></svg><p>完成一次采集后，记录会出现在这里</p></div>
-        <ol id="participant-list" class="participant-list" hidden></ol>
-      </section>
-      <section class="panel group-panel" aria-labelledby="group-title">
-        <div class="panel-header"><h2 id="group-title">群体分布</h2></div>
-        <div id="group-empty" class="empty-state"><svg class="icon empty-icon"><use href="#icon-chart"></use></svg><p>完成一次采集后，这里将显示群体的表情分布</p></div>
-        <div id="group-scores" class="scores compact-scores" aria-label="群体表情分数" hidden></div>
-      </section>
-    </div>
-
-    <details class="image-test">
-      <summary>用照片参与</summary>
-      <div class="image-test-body">
-        <p class="test-explanation">选择一张清晰正面人脸照片，在浏览器内分析。确认后点击“加入作品”，照片才会进入你的三维群体脸。</p>
-        <form id="image-test-form" class="image-test-form">
-          <label for="test-file">选择图片</label>
-          <input id="test-file" name="file" type="file" accept="image/jpeg,image/png,image/webp" required>
-          <button id="test-image" class="button compact" type="submit" disabled>分析图片</button>
-        </form>
-        <div id="image-test-result" hidden>
-          <p id="image-test-detail" role="status"></p>
-          <button id="add-image" class="button compact" type="button" disabled>将这张照片加入作品</button>
-          <div class="image-test-results"><img id="test-preview" alt="本地测试图片预览"><div id="image-scores" class="scores compact-scores" aria-label="图片测试表情分数"></div></div>
-        </div>
-      </div>
-    </details>
-    </section>
-
     <section id="scent-panel" class="scent-panel scent-atelier" role="tabpanel" aria-labelledby="nav-scent" data-phase="stopped" hidden>
+      <div class="module-heading"><div><h2>情绪调香仪</h2><span>八支原料 · 调配、混合、释放</span></div><button class="module-expand" data-focus-view="scent" aria-label="放大情绪调香仪">放大 <span aria-hidden="true">↗</span></button></div>
+      <div id="scent-ribbon" class="scent-ribbon" aria-label="原料沿管道汇入混合舱并释放的实时气味模拟"></div>
       <header class="scent-header">
         <div class="scent-identity">
           <p class="scent-eyebrow">03 / THE OLFACTORY INSTRUMENT</p>
@@ -314,7 +256,72 @@
       <details class="scent-history"><summary><span>最近调配过程</span><svg class="icon" aria-hidden="true"><use href="#icon-chevron"></use></svg></summary><ol id="scent-log" class="scent-log" aria-label="最近的气味模拟过程" hidden></ol></details>
     </section>
 
+    </div>
+    <section id="capture-panel" class="view-panel" role="tabpanel" aria-labelledby="nav-capture" hidden>
+    <p class="capture-privacy">照片与表情分析仅在本浏览器处理，不上传；刷新会清空本轮。当前表情只在采集完成后加入群体。首次启用需要下载模型。</p>
+    <div class="primary-grid">
+      <section class="camera-section" aria-label="摄像头采集">
+        <div class="preview">
+          <video id="camera-stream" class="camera-stream" aria-label="摄像头实时镜像预览" autoplay playsinline muted hidden></video>
+          <div id="camera-placeholder" class="camera-placeholder">
+            <svg class="icon camera-icon"><use href="#icon-camera"></use></svg>
+            <h2 id="camera-placeholder-title">摄像头尚未开启</h2>
+            <p id="camera-placeholder-detail">开启摄像头后，正对镜头开始采集</p>
+          </div>
+          <div id="preview-badge" class="preview-badge" hidden>等待有效人脸</div>
+        </div>
+        <div class="camera-actions">
+          <button id="start-camera" class="button primary" disabled><svg class="icon"><use href="#icon-camera"></use></svg><span>开启摄像头</span></button>
+          <button id="capture" class="button" disabled><svg class="icon"><use href="#icon-clock"></use></svg><span id="capture-label">采集 1.5 秒</span></button>
+          <button id="stop-camera" class="button subtle" disabled><svg class="icon"><use href="#icon-stop"></use></svg><span>停止摄像头</span></button>
+        </div>
+        <div class="camera-feedback">
+          <p id="capture-detail" role="status">开启摄像头后，采集一位观众的表情。</p>
+          <div id="capture-progress" class="capture-progress" role="progressbar" aria-label="采集进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><span id="capture-progress-fill"></span></div>
+        </div>
+      </section>
+
+      <section class="panel live-panel" aria-labelledby="live-title">
+        <div class="panel-header"><h2 id="live-title">实时表情倾向</h2><span id="top-emotion" class="top-emotion"></span></div>
+        <div id="live-scores" class="scores" aria-label="八类表情分数"></div>
+        <p id="live-detail" class="panel-note" role="status">等待开启摄像头</p>
+        <p id="performance" class="performance"></p>
+      </section>
+    </div>
+
+    <div class="session-grid">
+      <section class="panel records-panel" aria-labelledby="records-title">
+        <div class="panel-header"><div class="heading-with-count"><h2 id="records-title">本轮参与记录</h2><span id="participant-count" class="count">0 人</span></div><button id="reset-session" class="button compact subtle" disabled><svg class="icon"><use href="#icon-trash"></use></svg><span>清空本轮</span></button></div>
+        <div id="records-empty" class="empty-state"><svg class="icon empty-icon"><use href="#icon-record"></use></svg><p>完成一次采集后，记录会出现在这里</p></div>
+        <ol id="participant-list" class="participant-list" hidden></ol>
+      </section>
+      <section class="panel group-panel" aria-labelledby="group-title">
+        <div class="panel-header"><h2 id="group-title">群体分布</h2></div>
+        <div id="group-empty" class="empty-state"><svg class="icon empty-icon"><use href="#icon-chart"></use></svg><p>完成一次采集后，这里将显示群体的表情分布</p></div>
+        <div id="group-scores" class="scores compact-scores" aria-label="群体表情分数" hidden></div>
+      </section>
+    </div>
+
+    <details class="image-test">
+      <summary>用照片参与</summary>
+      <div class="image-test-body">
+        <p class="test-explanation">选择一张清晰正面人脸照片，在浏览器内分析。确认后点击“加入作品”，照片才会进入你的三维群体脸。</p>
+        <form id="image-test-form" class="image-test-form">
+          <label for="test-file">选择图片</label>
+          <input id="test-file" name="file" type="file" accept="image/jpeg,image/png,image/webp" required>
+          <button id="test-image" class="button compact" type="submit" disabled>分析图片</button>
+        </form>
+        <div id="image-test-result" hidden>
+          <p id="image-test-detail" role="status"></p>
+          <button id="add-image" class="button compact" type="button" disabled>将这张照片加入作品</button>
+          <div class="image-test-results"><img id="test-preview" alt="本地测试图片预览"><div id="image-scores" class="scores compact-scores" aria-label="图片测试表情分数"></div></div>
+        </div>
+      </div>
+    </details>
+    </section>
+
     <footer class="page-footer">
+      <p class="copyright">Copyright@bybybye317 2026</p>
       <p><svg class="icon"><use href="#icon-info"></use></svg><span>模型推断表情倾向，不等同于真实内心感受</span></p>
       <p id="model-status" class="model-status">浏览器内推理 · 点击后加载</p>
       <p><a href="https://github.com/bybybye317-source/emotion-exhibition" target="_blank" rel="noopener noreferrer">GitHub 项目</a> · <a href="./THIRD_PARTY_NOTICES.md">素材与依赖说明</a></p>

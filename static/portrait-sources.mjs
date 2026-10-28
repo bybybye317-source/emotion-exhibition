@@ -1,4 +1,3 @@
-import {REGION_NAMES} from './portrait-regions.mjs?v=20261028-real';
 const key=record=>JSON.stringify([record.id,record.image_url,record.photo_anchors]);
 export const sourceLabel=(record,index=0)=>`观众 ${String(record?.number||index+1).padStart(2,'0')}`;
 
@@ -22,7 +21,7 @@ export class PortraitSources{
   for(const [index,record] of records.entries()){
    let button=this.buttons.get(record.id);const source=images.get(key(record));
    if(!button){button=document.createElement('button');button.type='button';button.className='portrait-source';button.append(document.createElement('canvas'),document.createElement('span'));button.addEventListener('click',()=>this.onSelect(record.id));this.buttons.set(record.id,button);this.list.append(button);}
-   button.disabled=busy||!source;button.setAttribute('aria-label',`${sourceLabel(record,index)}，画面${REGION_NAMES[record.slot]}，查看贡献`);
+   button.disabled=busy||!source;button.setAttribute('aria-label',`${sourceLabel(record,index)}，6 个分散碎片，查看贡献`);
    button.querySelector('span').textContent=sourceLabel(record,index);
    if(source&&button.source!==source){const c=button.querySelector('canvas');c.width=80;c.height=98;c.getContext('2d').drawImage(source,0,0,80,98);button.source=source;}
   }
@@ -33,7 +32,7 @@ export class PortraitSources{
   this.selected=id;const index=this.records?.findIndex(r=>r.id===id),record=this.records?.[index],image=record&&this.images.get(key(record));
   for(const [key,button] of this.buttons)button.setAttribute('aria-pressed',String(key===id));
   this.reference.hidden=!image;const c=document.getElementById('portrait-source-photo');
-  if(image){c.width=160;c.height=196;c.getContext('2d').drawImage(image,0,0);document.getElementById('portrait-source-name').textContent=sourceLabel(record,index);document.getElementById('portrait-source-location').textContent=`贡献位置 · 画面${REGION_NAMES[record.slot]}`;}
+  if(image){c.width=160;c.height=196;c.getContext('2d').drawImage(image,0,0);document.getElementById('portrait-source-name').textContent=sourceLabel(record,index);document.getElementById('portrait-source-location').textContent=`贡献位置 · 6 个分散碎片`;}
   else{c.width=c.height=1;}
  }
  dispose(){this.update([],new Map());}

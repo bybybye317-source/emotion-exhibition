@@ -1,3 +1,4 @@
+import {fragmentReveal} from './portrait-fragments.mjs?v=20261028-gallery192';
 import {PORTRAIT_REGION_COUNT} from './portrait-regions.mjs?v=20261028-real';
 const clamp01 = value => Math.max(0, Math.min(1, value));
 const smootherstep = value => {const x=clamp01(value);return x*x*x*(x*(x*6-15)+10);};
@@ -92,11 +93,12 @@ export function blendLinearPixels(fromRGBA,toRGBA,mix,outRGBA) {
 
 // Freeze an interrupted arrival with premultiplied coverage. Empty sculpture
 // pixels must not be baked into a visitor's photograph during a second join.
-export function blendCoveredPixels(from,to,fromMask,toMask,mix){
+export function blendCoveredPixels(from,to,fromMask,toMask,mix,revealMask){
  if(!from||from.length%4||[to,fromMask,toMask].some(a=>a?.length!==from.length))throw new RangeError('Portrait colour and coverage buffers must match');
  const t=Number.isFinite(mix)?clamp01(mix):0;
  for(let i=0;i<from.length;i+=4){
-  const a=fromMask[i]/255*(1-t),b=toMask[i]/255*t,coverage=a+b;
+  const local=revealMask?.[i+1]>127?fragmentReveal(t,revealMask[i+2]/255*5):t;
+  const a=fromMask[i]/255*(1-local),b=toMask[i]/255*local,coverage=a+b;
   for(let k=0;k<3;k++)from[i+k]=coverage>0?linearToSrgb[Math.round((srgbToLinear[from[i+k]]*a+srgbToLinear[to[i+k]]*b)/coverage*65535)]:from[i+k];
   from[i+3]=255;fromMask[i]=fromMask[i+1]=fromMask[i+2]=Math.round(coverage*255);fromMask[i+3]=255;
  }

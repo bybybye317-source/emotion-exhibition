@@ -1,0 +1,97 @@
+/* Shared black exhibition. Renderers stay mounted when a module is enlarged. */
+:root{--background:#08090b;--portrait-stage-bg:#08090b;--exhibition-line:#27292e;--exhibition-muted:#96989f;--exhibition-stage:clamp(300px,40vh,440px)}
+.app-shell{max-width:1680px;padding:22px 28px 18px}
+.page-header{display:flex;align-items:center;gap:28px;padding-bottom:18px;margin-bottom:0}
+.identity{display:block;flex-shrink:0}.page-header h1{font-size:29px;letter-spacing:.12em}.identity .project-title{font-size:10px;margin-top:6px;letter-spacing:.09em}
+.view-tabs{gap:21px;align-self:center}.view-tab{font-size:12px;padding:9px 0}.gallery-header-actions{display:flex;gap:8px}.gallery-header-actions .button{font-size:11px;min-height:35px;padding:8px 13px;white-space:nowrap}.gallery-header-actions .music-toggle{min-width:105px;background:transparent;color:#e0d9cc;border-color:#5e5a53;border-radius:30px}.gallery-header-actions .music-toggle[aria-pressed=true]{background:#c8b693;color:#131314}.gallery-header-actions #gallery-fullscreen{border-radius:30px;background:transparent}
+.page-header>.connection{display:none}
+.gallery-emotions{display:grid;grid-template-columns:125px minmax(0,1fr) 140px;gap:6px 25px;align-items:center;padding:18px 0 12px;border-bottom:1px solid var(--exhibition-line);margin-bottom:16px}
+.gallery-emotion-title h2{font-size:13px;font-weight:500;letter-spacing:.12em;margin:0 0 5px}.gallery-emotion-title span{font-size:11px;color:var(--exhibition-muted)}
+.gallery-spectrum{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:18px}.gallery-meter{display:grid;grid-template-columns:1fr auto;gap:8px 4px;font-size:10px;min-width:0}.gallery-meter>span{color:#bdbbb6}.gallery-meter output{font-size:9px;color:#95969b;font-variant-numeric:tabular-nums}.gallery-meter i{display:block;grid-column:1/-1;height:3px;background:#24262d;border-radius:2px;overflow:hidden}.gallery-meter b{display:block;width:0;height:100%;transition:width .7s ease}
+.gallery-preview{border-left:1px solid var(--exhibition-line);padding-left:18px}.gallery-preview label{display:block;font-size:9px;color:var(--exhibition-muted);margin-bottom:5px}.gallery-preview select{width:100%;padding:5px 6px;background:#101216;border:1px solid #34373e;color:#c7c6c2;border-radius:3px;font:11px inherit;font-size:11px;min-height:30px}
+#gallery-emotion-note{grid-column:2/-1;margin:3px 0 0;color:#777c86;font-size:9px;letter-spacing:.03em}
+.module-heading{display:none;align-items:center;justify-content:space-between;padding:5px 0 12px;gap:12px}.module-heading>div{display:flex;align-items:center;gap:16px}.module-heading h2{margin:0;font-family:"Songti SC",serif;font-weight:400;font-size:22px;letter-spacing:.08em}.module-heading span{color:var(--exhibition-muted);font-size:10px}.module-expand{border:0;background:transparent;color:#b2afa8;font:inherit;font-size:10px;cursor:pointer;padding:6px 2px;white-space:nowrap}.module-expand:hover{color:#e4d2b2}.module-expand span{font-size:15px;margin-left:5px}
+body[data-view=gallery] .gallery-panels{display:grid;grid-template-columns:minmax(0,42fr) minmax(0,58fr);gap:18px 24px;align-items:start}
+body[data-view=gallery] .module-heading{display:flex}
+body[data-view=gallery] #portrait-panel{grid-column:1;min-width:0}body[data-view=gallery] #music-panel{grid-column:2;min-width:0;margin:0;padding:0;border:0;background:transparent;align-self:stretch;display:flex;flex-direction:column}
+body[data-view=gallery] .portrait-layout{display:block}body[data-view=gallery] .portrait-workspace{height:var(--exhibition-stage);border:0;border-radius:0}
+body[data-view=gallery] .portrait-toolbar{left:12px;right:12px;bottom:12px;gap:4px;flex-wrap:nowrap}body[data-view=gallery] .portrait-controls-hint{font-size:9px}body[data-view=gallery] .portrait-control.button{padding:6px;font-size:9px;min-height:29px}body[data-view=gallery] #portrait-fullscreen{display:none}body[data-view=gallery] #portrait-rotate .icon{display:none}
+body[data-view=gallery] .portrait-rail{display:grid;grid-template-columns:minmax(0,1fr) auto;padding:12px 0 0;border:0;gap:6px 12px}
+body[data-view=gallery] .portrait-count,body[data-view=gallery] .portrait-distribution,body[data-view=gallery] .portrait-preview-details{display:none}
+body[data-view=gallery] .portrait-status{grid-column:1;grid-row:1;font-size:11px;font-weight:400;margin:0;line-height:1.5;color:#c4beb2}
+body[data-view=gallery] .portrait-description{grid-column:1/-1;grid-row:2;font-size:10px;min-height:0;line-height:1.6;margin:0;color:#898c94}
+body[data-view=gallery] .portrait-show-piece{grid-column:2;grid-row:1;margin:0;font-size:10px;padding:4px 8px;min-height:26px}
+body[data-view=gallery] .portrait-sources{grid-column:1/-1;grid-row:3;border-top:1px solid #26282e;padding-top:9px;margin-top:5px;display:grid;grid-template-columns:minmax(0,1fr) 154px;gap:10px}
+body[data-view=gallery] .portrait-sources>h3,body[data-view=gallery] .portrait-sources>p{display:none}
+body[data-view=gallery] .portrait-source-list{display:flex;gap:6px;overflow-x:auto;max-height:none;padding-bottom:4px;align-items:start}
+body[data-view=gallery] .portrait-source{flex:0 0 42px;padding:2px}.portrait-source span{font-size:9px}
+body[data-view=gallery] .portrait-source-reference{display:flex;align-items:center;gap:8px;padding:0;margin:0;border:0}
+body[data-view=gallery] .portrait-source-reference canvas{width:40px;height:49px;flex-shrink:0}body[data-view=gallery] .portrait-source-reference strong{font-size:10px}body[data-view=gallery] .portrait-source-reference span{font-size:9px;line-height:1.6}body[data-view=gallery] .portrait-source-reference small{display:none}
+body[data-view=gallery] .portrait-piece-card{width:125px;top:12px;left:12px;padding:8px}body[data-view=gallery] .portrait-piece-image{height:75px;margin:6px 0}body[data-view=gallery] .portrait-piece-card>span,body[data-view=gallery] .portrait-piece-card strong{font-size:9px}
+body[data-view=gallery] .portrait-arrival-note{bottom:58px;font-size:10px}
+body[data-view=gallery] .music-emotion-choices,body[data-view=gallery] .music-visual-heading>span,body[data-view=gallery] .music-visual-heading>h2,body[data-view=gallery] .music-notes,body[data-view=gallery] .music-texture{display:none}
+body[data-view=gallery] .music-visual-stage{height:var(--exhibition-stage);flex:1 0 var(--exhibition-stage);min-height:0;aspect-ratio:auto;margin:0;border:0;border-radius:0}
+body[data-view=gallery] .music-visual-heading{top:14px;left:16px}body[data-view=gallery] .music-visual-heading p{font-size:10px}
+body[data-view=gallery] .music-visual-toolbar{left:14px;right:14px;bottom:13px;gap:6px}body[data-view=gallery] .music-visual-caption p{font-size:10px}body[data-view=gallery] #music-visual-description{font-size:9px}body[data-view=gallery] #music-visual-fullscreen{display:none}body[data-view=gallery] .music-visual-actions .button{font-size:9px;padding:6px;min-height:28px}
+body[data-view=gallery] .music-main{display:grid;grid-template-columns:minmax(0,1fr) 160px;gap:6px 20px;padding:12px 0 0;align-items:center}body[data-view=gallery] .music-heading h2,body[data-view=gallery] .music-character{display:none}body[data-view=gallery] .music-heading{margin:0}body[data-view=gallery] .music-status{font-size:10px;background:transparent;padding:0}body[data-view=gallery] .music-source{font-size:10px;margin:5px 0 0}
+body[data-view=gallery] .music-controls{grid-column:2;grid-row:1;display:block;padding:0;border:0}body[data-view=gallery] .music-volume-control{gap:8px;font-size:10px}body[data-view=gallery] .music-volume-control label,body[data-view=gallery] .music-volume-control output{font-size:10px}body[data-view=gallery] .music-volume-control input{min-width:0;width:80px}
+body[data-view=gallery] .music-layers{grid-column:1/-1;grid-row:2;display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-top:4px}body[data-view=gallery] .music-layer{display:block;min-width:0}body[data-view=gallery] .music-layer>span{font-size:9px;display:block;margin-bottom:6px}body[data-view=gallery] .music-layer-track{height:2px}
+body[data-view=gallery] #scent-panel{grid-column:1/-1;border-top:1px solid var(--exhibition-line);padding:15px 0 0;position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 22px}
+body[data-view=gallery] #scent-panel>.module-heading{grid-column:1;grid-row:1;padding-bottom:0}
+body[data-view=gallery] .scent-header{grid-column:2;grid-row:1;margin:0;display:block}body[data-view=gallery] .scent-identity{display:none}body[data-view=gallery] .scent-controls{gap:8px}body[data-view=gallery] .scent-controls .button{font-size:10px;padding:7px 10px;min-height:31px}
+.scent-ribbon{display:none;min-width:0}body[data-view=gallery] .scent-ribbon{display:block;grid-column:1/-1;grid-row:2;padding:8px 0 0}
+.scent-ribbon svg{display:block;width:100%;height:auto;max-height:240px}.scent-ribbon text{font:11px -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;fill:#b7b5ae}.scent-ribbon .sr-ratio{font-size:12px;fill:#ded6c5}.sr-pipe{fill:none;stroke:#3c4249;stroke-width:4}.sr-stream{fill:none;stroke-width:2;opacity:0}.sr-reservoir{cursor:pointer}.sr-reservoir:focus{outline:none}.sr-reservoir[aria-pressed=true]>rect:first-child,.sr-reservoir:focus-visible>rect:first-child{stroke:#ddd0b2;stroke-width:1.5}.sr-explanation{display:flex;gap:14px;align-items:baseline;margin:3px 0 0;font-size:10px;line-height:1.8;color:#90949c}.sr-explanation strong{font-weight:400;white-space:nowrap;color:#cdbd9d}
+body[data-view=gallery] .scent-preview-strip,body[data-view=gallery] .scent-machine-figure,body[data-view=gallery] .scent-inspector,body[data-view=gallery] .scent-composition,body[data-view=gallery] .scent-history{display:none}
+body[data-view=gallery] .scent-workbench,body[data-view=gallery] .scent-machine-column{display:contents}body[data-view=gallery] .scent-cycle{grid-column:1/-1;grid-row:3;display:grid;grid-template-columns:220px minmax(0,1fr);gap:10px 24px;border:0;padding:10px 0 0;margin:0;align-items:center}body[data-view=gallery] .scent-cycle-steps{gap:14px;margin:0;font-size:10px}body[data-view=gallery] .scent-cycle-steps li{font-size:10px;gap:5px}body[data-view=gallery] .scent-cycle-steps li>span{font-size:8px}body[data-view=gallery] .scent-progress-heading{margin:0;font-size:10px}body[data-view=gallery] .scent-progress-heading>span{font-size:10px}body[data-view=gallery] .scent-progress{grid-column:1/-1;height:2px;margin:0}
+.page-footer{margin-top:17px;padding-top:12px;gap:8px 20px;justify-content:space-between}.page-footer p{font-size:9px;margin:0}.page-footer .copyright{color:#bab5ac;letter-spacing:.08em}.page-footer #model-status{display:none}.capture-privacy{font-size:12px;line-height:1.8;color:#9d9ea5;padding:18px 0}
+[hidden]{display:none!important}
+body:not([data-view=gallery]) .gallery-panels{display:block}body:not([data-view=gallery]) .gallery-panels>.module-heading{display:none}
+.portrait-workspace:fullscreen{height:100vh!important}html:fullscreen .app-shell{max-width:1680px}
+@media(max-width:1200px){.app-shell{padding:18px 22px}.page-header{gap:20px}.identity .project-title{font-size:9px}.view-tabs{gap:14px}.page-header h1{font-size:25px}.gallery-header-actions .button{padding:7px 9px}.gallery-emotions{grid-template-columns:100px minmax(0,1fr) 120px;gap:7px 18px}.gallery-spectrum{gap:12px}.module-heading>div{gap:9px}.module-heading h2{font-size:20px}.module-heading span{font-size:9px}body[data-view=gallery] .portrait-controls-hint{display:none}body[data-view=gallery] .portrait-toolbar{justify-content:flex-end}body[data-view=gallery] .portrait-sources{grid-template-columns:minmax(0,1fr) 130px}}
+@media(max-width:900px){:root{--exhibition-stage:300px}.app-shell{padding:18px}.page-header{display:grid;grid-template-columns:1fr auto;gap:12px}.identity{grid-column:1;grid-row:1;display:flex;gap:16px}.identity .project-title{font-size:9px;white-space:normal;max-width:130px;line-height:1.7}.gallery-header-actions{grid-column:2;grid-row:1}.view-tabs{grid-column:1/-1;grid-row:2;gap:24px;margin:0;justify-content:center}.gallery-emotions{grid-template-columns:92px minmax(0,1fr) 112px;gap:5px 12px;padding:14px 0 10px}.gallery-spectrum{grid-template-columns:repeat(4,1fr);gap:9px 14px}.gallery-meter{gap:4px;font-size:9px}.gallery-preview{padding-left:12px}#gallery-emotion-note{font-size:8px;grid-column:1/-1;margin-top:6px}body[data-view=gallery] .gallery-panels{gap:18px 16px;grid-template-columns:minmax(0,43fr) minmax(0,57fr)}.module-heading>div{display:block}.module-heading h2{font-size:20px}.module-heading>div>span{display:block;margin-top:5px}body[data-view=gallery] .portrait-rail{grid-template-columns:1fr}body[data-view=gallery] .portrait-show-piece{grid-column:1;grid-row:3;justify-self:start}body[data-view=gallery] .portrait-sources{grid-row:4;grid-template-columns:1fr}body[data-view=gallery] .portrait-source-reference{display:none}body[data-view=gallery] .music-main{grid-template-columns:1fr}body[data-view=gallery] .music-controls{grid-column:1;grid-row:3;margin-top:8px}body[data-view=gallery] .music-layers{gap:6px}body[data-view=gallery] .music-visual-toolbar{align-items:flex-end}body[data-view=gallery] .music-visual-caption{max-width:65%}body[data-view=gallery] .music-visual-caption p{font-size:9px}body[data-view=gallery] #music-visual-description{display:none}body[data-view=gallery] #scent-panel{gap:0 12px}.scent-ribbon svg{min-height:155px}.sr-explanation{font-size:9px}body[data-view=gallery] .scent-progress-heading #scent-detail{display:none}body[data-view=gallery] .scent-cycle{grid-template-columns:1fr auto}body[data-view=gallery] .scent-cycle-steps{gap:22px}}
+@media(max-width:600px){.app-shell{padding:16px 14px}.page-header h1{font-size:23px}.identity{display:block}.identity .project-title{font-size:8px;max-width:none}.gallery-header-actions{gap:6px}.gallery-header-actions .button{font-size:10px;min-height:32px}.gallery-header-actions #gallery-fullscreen span{display:none}.gallery-header-actions .music-toggle{min-width:90px}.view-tabs{justify-content:space-between;gap:10px}.view-tab{font-size:11px}.gallery-emotions{grid-template-columns:1fr 115px;gap:10px}.gallery-emotion-title{display:flex;gap:15px;align-items:baseline}.gallery-emotion-title h2{font-size:12px;margin:0}.gallery-emotion-title span{font-size:10px}.gallery-preview{grid-column:2;grid-row:1;border:0;padding:0;display:flex;align-items:center;gap:7px}.gallery-preview label{display:none}.gallery-preview select{font-size:10px}.gallery-spectrum{grid-column:1/-1;grid-row:2;gap:9px 18px}.gallery-meter{font-size:10px}body[data-view=gallery] .gallery-panels{grid-template-columns:minmax(0,1fr);gap:22px}body[data-view=gallery] #portrait-panel,body[data-view=gallery] #music-panel{grid-column:1}.module-heading>div{display:flex;align-items:baseline;gap:14px}.module-heading>div>span{margin:0}.module-heading h2{font-size:21px}body[data-view=gallery] .portrait-workspace{height:310px}body[data-view=gallery] .music-visual-stage{flex:none;height:280px}body[data-view=gallery] .portrait-rail{grid-template-columns:1fr auto}body[data-view=gallery] .portrait-show-piece{grid-row:1;grid-column:2}body[data-view=gallery] .portrait-sources{grid-column:1/-1;grid-row:3}body[data-view=gallery] #scent-panel{display:flex;flex-direction:column;padding-top:18px}body[data-view=gallery] .scent-header{order:2;align-self:flex-start;margin-top:12px}.scent-ribbon svg{min-height:0;width:100%;height:auto}.scent-ribbon{overflow:hidden}.sr-explanation{font-size:10px;align-items:flex-start}.sr-explanation strong{padding-top:1px}body[data-view=gallery] .scent-cycle{display:grid;order:3;margin-top:10px;gap:8px}body[data-view=gallery] .scent-cycle-steps{gap:15px}.page-footer{display:flex;flex-direction:column;align-items:flex-start;gap:8px}.page-footer .copyright{order:3;margin-top:5px}body[data-view=gallery] #scent-panel>.module-heading{width:100%}}
+@media(prefers-reduced-motion:reduce){.gallery-meter b{transition:none}}
+/* Keep the complete work in a laptop viewport, with details in focused views. */
+@media(min-width:901px){
+ :root{--exhibition-stage:clamp(250px,30vh,350px)}
+ .app-shell{padding-top:16px}.page-header{padding-bottom:12px}.gallery-emotions{padding:12px 0 9px;margin-bottom:13px}
+ .scent-ribbon svg{max-height:175px}
+ body[data-view=gallery] .gallery-panels{gap:16px 24px}
+ body[data-view=gallery] .scent-cycle{padding-top:7px;gap:7px 24px}
+ body[data-view=gallery] #scent-panel{padding-top:12px}
+}
+body[data-view=gallery] .music-main{background:none;border:0;border-radius:0;box-shadow:none}
+body[data-view=gallery] .music-layer-track{margin-top:4px}
+.page-footer p{font-size:10px}.gallery-header-actions .button{font-size:12px}
+body[data-view=gallery] .portrait-workspace:fullscreen{height:100vh!important}
+@media(max-width:600px){
+ body[data-view=gallery] .scent-composition{display:block;order:1;margin:10px 0 0;padding:0;border:0}
+ body[data-view=gallery] .scent-composition-heading{display:none}
+ body[data-view=gallery] .scent-ingredients{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+ body[data-view=gallery] .scent-ingredient-button{padding:9px 8px;background:transparent;border-color:#292c32}
+ body[data-view=gallery] .scent-ingredient-button::before{margin-bottom:7px;width:13px}
+ body[data-view=gallery] .scent-material-name{font-size:10px}body[data-view=gallery] .scent-material-ratio{font-size:16px;line-height:1.4;margin-top:3px}
+ body[data-view=gallery] .scent-material-delta{font-size:8px;min-height:12px}
+ .scent-ribbon svg text{display:none}.scent-ribbon svg{min-height:95px}
+}
+.sr-pipe{stroke-width:2}.sr-stream{stroke-width:1.5}
+@media(min-width:601px) and (max-width:900px){
+ :root{--exhibition-stage:230px}
+ body[data-view=gallery] .portrait-rail{grid-template-columns:minmax(0,1fr) auto;gap:5px 6px}
+ body[data-view=gallery] .portrait-status{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px}
+ body[data-view=gallery] .portrait-show-piece{grid-column:2;grid-row:1;font-size:9px;padding:4px 6px}
+ body[data-view=gallery] .portrait-description{font-size:9px;line-height:1.6}
+ body[data-view=gallery] .portrait-sources{grid-row:3}
+ body[data-view=gallery] .portrait-source{flex-basis:34px}
+ body[data-view=gallery] .music-main{gap:5px}
+ body[data-view=gallery] .music-controls{grid-column:1;grid-row:3;margin-top:2px}
+ .scent-ribbon svg{min-height:125px;max-height:135px}
+}
+@media(min-width:901px) and (max-height:800px){
+ :root{--exhibition-stage:190px}
+ .app-shell{padding-top:12px}.page-header{padding-bottom:8px}.gallery-emotions{padding-top:8px;padding-bottom:8px;margin-bottom:10px}
+ body[data-view=gallery] .portrait-source{flex-basis:34px}
+ body[data-view=gallery] .portrait-source-reference canvas{width:34px;height:42px}
+ .scent-ribbon svg{max-height:125px}
+ body[data-view=gallery] .gallery-panels{gap:12px 24px}
+}

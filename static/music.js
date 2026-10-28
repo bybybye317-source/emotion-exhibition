@@ -62,7 +62,7 @@ function render() {
     text(`music-${name}-value`, `${Math.round((playingParameters[name] ?? 0) * 100)}%`);
   }
   visualController?.refresh();
-  const panel = $('music-toggle').closest('section');
+  const panel = $('music-panel');
   if (panel) {
     panel.dataset.playing = String(playing);
     panel.dataset.source = preview !== 'group' ? 'preview' : target.idle ? 'idle' : 'group';

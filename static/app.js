@@ -1,5 +1,5 @@
 import {BrowserEmotionAnalyzer} from './browser-inference.mjs?v=20261028-anatomy';
-import {LocalSession, EMOTION_KEYS} from './session-state.mjs?v=20261028-real';
+import {LocalSession, EMOTION_KEYS} from './session-state.mjs?v=20261028-gallery192';
 import {CAPTURE_POLICY, CAPTURE_DURATION_LABEL, CaptureWindow} from './capture-window.mjs?v=20261028-fast';
 
 const $=id=>document.getElementById(id);
@@ -153,8 +153,22 @@ $('image-test-form').addEventListener('submit',async event=>{
 $('add-image').addEventListener('click',()=>{
   if(!testedImage)return;session.add({scores:testedImage.scores,photoUrl:URL.createObjectURL(testedImage.blob),anchors:testedImage.anchors});testedImage=null;$('image-test-detail').textContent='已加入当前群体作品，可以继续添加下一位。';state.capture={status:'completed',progress:1,detail:'照片已加入作品，正在展示你贡献的片段。'};revealContribution();
 });
-const views=['portrait','music','scent','capture'];const viewTitles={portrait:'群体肖像',music:'群体声景',scent:'群体气味',capture:'参与作品'};
-function selectView(name,focus=false){if(!views.includes(name))name='portrait';for(const view of views){const active=name===view;const tab=$(`nav-${view}`);tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;$(`${view}-panel`).hidden=!active;if(active&&focus)tab.focus();}$('page-title').textContent=viewTitles[name];document.title=`${viewTitles[name]} · 机器如何理解人类的情绪`;window.dispatchEvent(new Event('resize'));if(location.hash!==`#${name}-panel`)history.replaceState(null,'',`#${name}-panel`);}
+const views=['gallery','portrait','music','scent','capture'];const viewTitles={gallery:'共感展厅',portrait:'群体肖像',music:'群体声景',scent:'群体气味',capture:'参与作品'};
+function selectView(name,focus=false){
+ if(!views.includes(name))name='gallery';
+ document.body.dataset.view=name;
+ for(const view of views){
+  const active=name===view,tab=$(`nav-${view}`);tab.setAttribute('aria-selected',String(active));tab.tabIndex=active?0:-1;
+  if(view==='gallery')$('gallery-panel').hidden=name==='capture';
+  else $(`${view}-panel`).hidden=!(active||name==='gallery'&&view!=='capture');
+  if(active&&focus)tab.focus();
+ }
+ $('gallery-emotions').hidden=name==='capture';
+ $('page-title').textContent=viewTitles[name];document.title=`${viewTitles[name]} · 机器如何理解人类的情绪`;
+ window.dispatchEvent(new Event('resize'));
+ if(location.hash!==`#${name}-panel`)history.replaceState(null,'',`#${name}-panel`);
+ window.dispatchEvent(new CustomEvent('exhibition:view',{detail:{view:name}}));
+}
 function revealContribution(){
   // Publish the new record before revealing the stage so its arrival can be
   // prepared while hidden, then begin once the audience can actually see it.
@@ -164,19 +178,23 @@ function revealContribution(){
     preview.value='group';
     preview.dispatchEvent(new Event('change'));
   }
-  selectView('portrait',true);
-  $('portrait-workspace').scrollIntoView({behavior:'instant',block:'center'});
+  selectView('gallery',true);
+  window.scrollTo({top:0,behavior:'instant'});
   window.dispatchEvent(new Event('portrait:reveal'));
 }
-function selectHashView(){const name=location.hash.replace(/^#/, '').replace(/-panel$/, '');selectView(views.includes(name)?name:'portrait');}
+function selectHashView(){const name=location.hash.replace(/^#/, '').replace(/-panel$/, '');selectView(views.includes(name)?name:'gallery');}
 window.addEventListener('hashchange',selectHashView);
 for(const [i,name] of views.entries()){
   $(`nav-${name}`).addEventListener('click',()=>selectView(name));
   $(`nav-${name}`).addEventListener('keydown',event=>{let next;if(event.key==='ArrowRight')next=views[(i+1)%views.length];if(event.key==='ArrowLeft')next=views[(i+views.length-1)%views.length];if(event.key==='Home')next=views[0];if(event.key==='End')next=views.at(-1);if(next){event.preventDefault();selectView(next,true);}});
 }
 document.querySelectorAll('a[href="#scent-panel"]').forEach(link=>link.addEventListener('click',()=>selectView('scent')));
+document.querySelectorAll('[data-focus-view]').forEach(button=>button.addEventListener('click',()=>{selectView(button.dataset.focusView,true);window.scrollTo({top:0,behavior:'instant'});}));
 window.addEventListener('emotion:state-request',emit);
 const tick=setInterval(()=>{if(captureRun){state.capture.progress=captureRun.progress(performance.now());render();}},100);
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&(stream||state.camera.status==='starting'))stopCamera('页面离开前台，摄像头和本次采集已停止。');});
 window.addEventListener('pagehide',event=>{stopCamera();if(event.persisted)return;disposed=true;clearInterval(tick);session.reset();clearTest();analyzer.dispose?.();});
 selectHashView();render();
+// A fragment URL names the view; it must not scroll the shared emotion band away.
+requestAnimationFrame(()=>requestAnimationFrame(()=>window.scrollTo({top:0,behavior:'instant'})));
+window.addEventListener('load',()=>window.scrollTo({top:0,behavior:'instant'}),{once:true});

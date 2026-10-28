@@ -1,3 +1,4 @@
+import {ScentRibbon} from './scent-ribbon.mjs?v=20261028-gallery192';
 import {recipeForScores, CHANNELS, EMOTION_LABELS, explainIngredient} from './scent-math.mjs?v=20261028-fast';
 import {ScentSimulator} from './scent-engine.mjs?v=20261028-fast';
 import {deriveFluidState} from './scent-fluid.mjs?v=20261028-fast';
@@ -31,6 +32,7 @@ let explanationSignature = '';
 let selectedKey = CHANNELS[0].key;
 let explanationView = 'current';
 let instrument = null;
+const ribbon=new ScentRibbon($('scent-ribbon'),{onSelect:selectIngredient});
 const ingredientButtons = new Map();
 
 function text(id, value) {
@@ -175,6 +177,7 @@ function render() {
   if (state.pending && state.targetRecipe) text('scent-pending', '新情绪已进入下一轮目标。本轮配方与解释保持不变，后续调配将逐步靠近目标；点击“下一轮目标”查看变化。');
   instrument?.update({phase:state.phase,progress:state.progress,outputs:state.outputs,purge:state.purge,recipe,activeRecipe:state.activeRecipe,targetRecipe:state.targetRecipe,pending:state.pending,selectedKey,enabled:state.enabled});
   renderExplanation(state, recipe);
+  ribbon.update({phase:state.phase,progress:state.progress,outputs:state.outputs,purge:state.purge,recipe,activeRecipe:state.activeRecipe,targetRecipe:state.targetRecipe,pending:state.pending,selectedKey,enabled:state.enabled});
   const signature = JSON.stringify(state.logs);
   if (signature !== logSignature) {
     logSignature = signature;
@@ -262,7 +265,7 @@ window.addEventListener('pagehide', event => {
     disposed = true;
     clearInterval(timer);
     simulator.dispose();
-    instrument?.dispose();
+    instrument?.dispose();ribbon.dispose();
     window.removeEventListener('emotion:state', acceptState);
   }
 });

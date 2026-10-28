@@ -1,5 +1,5 @@
 import {PORTRAIT_REGION_COUNT} from './portrait-regions.mjs?v=20261028-real';
-import {fragmentSlot} from './portrait-math.mjs?v=20261028-real';
+import {fragmentSlot} from './portrait-math.mjs?v=20261028-gallery192';
 
 export const EMOTION_KEYS = ['happiness','neutral','sadness','surprise','anger','fear','disgust','contempt'];
 export function normalizedScores(scores) {

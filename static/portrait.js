@@ -1,18 +1,19 @@
+import {FRAGMENT_COUNT,FRAGMENTS_PER_PERSON,microFragmentCells,fragmentsForOwner,contributionDescription} from './portrait-fragments.mjs?v=20261028-gallery192';
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {createAlignedPhoto, paintCollage} from './portrait-collage.mjs?v=20261028-real';
-import {ARRIVAL_SECONDS, FragmentArrival, blendCoveredPixels} from './portrait-arrival.mjs?v=20261028-real';
-import {LABELS, morphWeights, normalizeScores, organicFragmentCells, planPatchAssignments} from './portrait-math.mjs?v=20261028-real';
+import {createAlignedPhoto, paintCollage} from './portrait-collage.mjs?v=20261028-gallery192';
+import {ARRIVAL_SECONDS, FragmentArrival, blendCoveredPixels} from './portrait-arrival.mjs?v=20261028-gallery192';
+import {LABELS, morphWeights, normalizeScores, planPatchAssignments} from './portrait-math.mjs?v=20261028-gallery192';
 
 import {calibratedProjection} from './portrait-features.mjs?v=20261028-real';
-import {ContributionGuide} from './portrait-contribution.mjs?v=20261028-real';
+import {ContributionGuide} from './portrait-contribution.mjs?v=20261028-gallery192';
 
 const $ = id => document.getElementById(id);
 const SIZE = 1024;
 const BASE_COLOR = '#aeb0ae';
-import {PORTRAIT_REGION_COUNT, REGION_NAMES} from './portrait-regions.mjs?v=20261028-real';
-import {PortraitSources, createSourceThumbnail, sourceLabel} from './portrait-sources.mjs?v=20261028-real';
+import {PORTRAIT_REGION_COUNT} from './portrait-regions.mjs?v=20261028-real';
+import {PortraitSources, createSourceThumbnail, sourceLabel} from './portrait-sources.mjs?v=20261028-gallery192';
 const photoKey = record => JSON.stringify([record.id,record.image_url,record.photo_anchors]);
 const MODEL_URL = new URL('./models/sculpture-head.glb', import.meta.url);
 const clamp01 = value => Math.min(1,Math.max(0,value));
@@ -144,8 +145,10 @@ class GroupPortrait {
       shader.vertexShader=shader.vertexShader.replace('#include <uv_vertex>','#include <uv_vertex>\nvPortraitWeight = portraitWeight;\nvSculpturePosition = position;');
       shader.fragmentShader='uniform sampler2D portraitCoverage;\nuniform sampler2D portraitPreviousCoverage;\nuniform sampler2D portraitPreviousMap;\nuniform sampler2D portraitArrivalMask;\nuniform float portraitArrivalMix;\nuniform float portraitArrivalGlow;\nuniform vec3 portraitEyeCenter;\nuniform float portraitPhotoMix;\nuniform vec3 portraitBaseColor;\nvarying float vPortraitWeight;\nvarying vec3 vSculpturePosition;\n'+shader.fragmentShader;
       shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',`
-        float beforeCoverage=texture2D(portraitPreviousCoverage,vMapUv).r*(1.0-portraitArrivalMix);
-        float afterCoverage=texture2D(portraitCoverage,vMapUv).r*portraitArrivalMix;
+        vec4 revealMask=texture2D(portraitArrivalMask,vMapUv);
+        float localMix=mix(portraitArrivalMix,smoothstep(revealMask.b*0.375,0.625+revealMask.b*0.375,portraitArrivalMix),step(0.5,revealMask.g));
+        float beforeCoverage=texture2D(portraitPreviousCoverage,vMapUv).r*(1.0-localMix);
+        float afterCoverage=texture2D(portraitCoverage,vMapUv).r*localMix;
         float coverage=beforeCoverage+afterCoverage;
         vec3 photograph=(texture2D(portraitPreviousMap,vMapUv).rgb*beforeCoverage+texture2D(map,vMapUv).rgb*afterCoverage)/max(coverage,0.00001);
         float photoPresence=coverage*portraitPhotoMix;
@@ -184,7 +187,7 @@ class GroupPortrait {
         totalEmissiveRadiance += vec3(0.95, 0.72, 0.40) * arrivalLight * portraitArrivalGlow * vPortraitWeight;
       `);
     };
-    material.customProgramCacheKey=()=> 'sculpted-portrait-collage-v7';
+    material.customProgramCacheKey=()=> 'sculpted-portrait-collage-v8';
     return material;
   }
 
@@ -281,10 +284,10 @@ class GroupPortrait {
   updateStatus() {
     $('portrait-count').textContent=`${this.records.length} 位观众`;
     let status=this.records.length?'每一块照片，都有自己的来处':'等待第一张真实面孔';
-    let detail=`空白模型上的 ${PORTRAIT_REGION_COUNT} 处细分区域，等待观众逐一填入。眉眼、鼻子与嘴唇保留完整。`;
-    if(this.records.length)detail=`${this.loadedCount} 块观众照片 · ${PORTRAIT_REGION_COUNT-this.loadedCount} 处空白。点击下方观众照片，查看他贡献的位置。`;
+    let detail=`192 个小碎片，每位观众贡献 6 片。未填入的位置保留素色模型。`;
+    if(this.records.length)detail=`${this.loadedCount*6} / 192 片已融入 · 点击观众照片，定位 6 个碎片。`;
     const arrival=this.arrival.snapshot();
-    if(this.lastArrivalSlots.length&&this.loadedCount)detail+=` 当前定位：${this.arrivalLocation()}。`;
+
     if(arrival.active){status='你的片段正在融入';detail=`${this.arrivalLocation()}正在慢慢浮现，柔光会在融入后散去。`;}
     if(this.loadingPhotos) status='正在将新片段拼入肖像…';
     else if(this.loadedCount<this.records.length) status=`已拼入 ${this.loadedCount}/${this.records.length} 块；部分照片不可用`;
@@ -298,23 +301,23 @@ class GroupPortrait {
     $('portrait-show-piece').disabled=arrival.active||!this.records.some(record=>this.photoCache.has(photoKey(record)));
     this.stage.dataset.participants=String(this.records.length);
     this.stage.dataset.photos=String(this.loadedCount);
-    this.stage.dataset.seeds='0';this.stage.dataset.regions=String(PORTRAIT_REGION_COUNT);
+    this.stage.dataset.seeds='0';this.stage.dataset.regions=String(FRAGMENT_COUNT);this.stage.dataset.filledFragments=String(this.loadedCount*FRAGMENTS_PER_PERSON);
     this.sources.update(this.records,this.sourceCache,{busy:arrival.active});
     this.stage.dataset.connected=String(this.connected);
   }
 
   arrivalLocation() {
-    return this.lastArrivalSlots.length===1?`画面${REGION_NAMES[this.lastArrivalSlots[0]]}`:`${this.lastArrivalSlots.length} 处新片段`;
+    return this.lastArrivalSlots.length===1?contributionDescription(this.lastArrivalSlots[0]):`${this.lastArrivalSlots.length*6} 处新片段`;
   }
 
   paintArrivalMask(slots) {
     const ctx=this.arrivalMaskContext;
     ctx.clearRect(0,0,SIZE,SIZE);
-    const cells=organicFragmentCells();
-    for(const slot of slots) {
+    const cells=microFragmentCells();
+    for(const owner of slots) for(const [ordinal,slot] of fragmentsForOwner(owner).entries()) {
       ctx.beginPath();cells[slot].forEach(([x,y],i)=>i?ctx.lineTo(x*SIZE,y*SIZE):ctx.moveTo(x*SIZE,y*SIZE));ctx.closePath();
-      ctx.filter='blur(5px)';ctx.fillStyle='#00ff00';ctx.fill();
-      ctx.lineWidth=7;ctx.strokeStyle='#ff0000';ctx.lineJoin='round';ctx.stroke();ctx.filter='none';
+      ctx.filter='blur(1px)';ctx.fillStyle=`rgb(0,255,${Math.round(ordinal/5*255)})`;ctx.fill();
+      ctx.lineWidth=2.5;ctx.strokeStyle=`rgb(255,255,${Math.round(ordinal/5*255)})`;ctx.lineJoin='round';ctx.stroke();ctx.filter='none';
     }
     this.arrivalMaskTexture.needsUpdate=true;
   }
@@ -328,7 +331,7 @@ class GroupPortrait {
       const from=this.fromContext.getImageData(0,0,SIZE,SIZE);
       const to=this.atlasContext.getImageData(0,0,SIZE,SIZE);
       const oldMask=this.fromCoverageContext.getImageData(0,0,SIZE,SIZE),newMask=this.coverageContext.getImageData(0,0,SIZE,SIZE);
-      blendCoveredPixels(from.data,to.data,oldMask.data,newMask.data,mix);this.fromContext.putImageData(from,0,0);this.fromCoverageContext.putImageData(oldMask,0,0);
+      blendCoveredPixels(from.data,to.data,oldMask.data,newMask.data,mix,this.arrivalMaskContext.getImageData(0,0,SIZE,SIZE).data);this.fromContext.putImageData(from,0,0);this.fromCoverageContext.putImageData(oldMask,0,0);
     }
     this.fromTexture.needsUpdate=true;this.fromCoverageTexture.needsUpdate=true;
   }
@@ -368,7 +371,7 @@ class GroupPortrait {
   prepareContribution(slot,replay=false) {
     const patch=planPatchAssignments(this.records)[slot],record=this.records[patch?.recordIndex];
     if(record)this.sources.select(record.id);
-    this.contribution.show({image:record&&this.photoCache.get(photoKey(record)),slot,head:this.head,location:`${sourceLabel(record,this.records.indexOf(record))} · 画面${REGION_NAMES[slot]}`,replay});
+    this.contribution.show({image:record&&this.photoCache.get(photoKey(record)),slot,head:this.head,location:`${sourceLabel(record,this.records.indexOf(record))} · 6 片分散融入`,replay});
   }
 
   replayContribution(id) {
@@ -380,7 +383,8 @@ class GroupPortrait {
     this.fromContext.clearRect(0,0,SIZE,SIZE);this.fromContext.drawImage(this.atlas,0,0);this.fromTexture.needsUpdate=true;
     this.fromCoverageContext.clearRect(0,0,SIZE,SIZE);this.fromCoverageContext.drawImage(this.coverage,0,0);this.fromCoverageTexture.needsUpdate=true;
     this.prepareContribution(record.slot,true);this.syncArrivalDisplay(this.arrival.snapshot());
-    $('portrait-workspace').scrollIntoView({behavior:'instant',block:'center'});
+    const rect=this.stage.getBoundingClientRect();
+    if(document.body.dataset.view!=='gallery'||rect.bottom<180||rect.top>innerHeight-180)$('portrait-workspace').scrollIntoView({behavior:'instant',block:'center'});
   }
 
   syncArrivalDisplay(arrival) {

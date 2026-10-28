@@ -1,6 +1,7 @@
+import {microFragmentCells,fragmentsForOwner} from './portrait-fragments.mjs?v=20261028-gallery192';
 import {balancePhotoLighting} from './portrait-lighting.mjs?v=20261028-light';
 import {refineFeatureWarp} from './portrait-features.mjs?v=20261028-real';
-import {affineFromTriangles, photoTriangle, organicFragmentCells, planPatchAssignments} from './portrait-math.mjs?v=20261028-real';
+import {affineFromTriangles, photoTriangle, planPatchAssignments} from './portrait-math.mjs?v=20261028-gallery192';
 
 const DEFAULT_COLOR = '#aaa69e';
 const makeCanvas = size => Object.assign(document.createElement('canvas'), {width:size, height:size});
@@ -183,7 +184,7 @@ export function createAlignedPhoto(image, anchors, {size=1024,bounds,landmarks,b
 }
 
 /**
- * Paint one region per person over the blank sculpture. Preserve
+ * Paint six dispersed microfragments per person over the blank sculpture. Preserve
  * null entries in alignedImages: their original slots remain blank, so
  * a failed load cannot move another person's fragment. No photo is repeated
  * across vacant cells or enlarged into the whole face. Coverage is separate
@@ -197,7 +198,7 @@ export function paintCollage(ctx, alignedImages, size=1024, baseColor=DEFAULT_CO
   ctx.fillStyle=baseColor;ctx.fillRect(0,0,size,size);
   if(coverageContext){coverageContext.save();coverageContext.setTransform(1,0,0,1,0,0);coverageContext.globalCompositeOperation='source-over';coverageContext.clearRect(0,0,size,size);coverageContext.fillStyle='#000';coverageContext.fillRect(0,0,size,size);coverageContext.globalCompositeOperation='lighter';}
   if(!sources.some(Boolean)){coverageContext?.restore();ctx.restore();return;}
-  const cells=organicFragmentCells().map(cell=>cell.map(([x,y])=>[x*size,y*size]));
+  const cells=microFragmentCells().map(cell=>cell.map(([x,y])=>[x*size,y*size]));
   // Blurred partition masks still sum to one in the interior. Add their
   // premultiplied colours instead of stacking transparent layers, which would
   // reveal the stone underpaint or leave an order-dependent hard seam.
@@ -205,9 +206,11 @@ export function paintCollage(ctx, alignedImages, size=1024, baseColor=DEFAULT_CO
   const mask=makeCanvas(size), maskCtx=mask.getContext('2d');
   const layer=makeCanvas(size), layerCtx=layer.getContext('2d');
   const feather=Math.max(.6,1.8*size/1024);
-  cells.forEach((cell,index)=>{
+  sources.forEach((source,index)=>{
     maskCtx.clearRect(0,0,size,size);maskCtx.filter=`blur(${feather}px)`;
-    maskCtx.fillStyle='#fff';polygon(maskCtx,cell);maskCtx.fill();maskCtx.filter='none';
+    maskCtx.fillStyle='#fff';
+    for(const id of fragmentsForOwner(index)){polygon(maskCtx,cells[id]);maskCtx.fill();}
+    maskCtx.filter='none';
     if(sources[index]&&coverageContext)coverageContext.drawImage(mask,0,0);
     layerCtx.globalCompositeOperation='source-over';layerCtx.clearRect(0,0,size,size);
     if(sources[index]) layerCtx.drawImage(sources[index],0,0,size,size);

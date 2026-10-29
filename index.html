@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#090a0c">
-  <meta name="description" content="机器如何理解人类的情绪：视觉、听觉与嗅觉模拟，三种感官随群体表情变化。可在浏览器内体验，照片不上传。">
+  <meta name="description" content="机器如何理解人类的情绪：视觉、听觉与嗅觉模拟，三种感官随群体表情变化。个人体验与教室共同作品。">
   <link rel="icon" href="data:,">
   <title>群体肖像 · 机器如何理解人类的情绪</title>
   <link rel="stylesheet" href="./static/style.css?v=20261027-emotions">
@@ -14,11 +14,13 @@
   <link rel="stylesheet" href="./static/scent-atelier.css?v=20261028-flow">
   <link rel="stylesheet" href="./static/exhibition.css?v=20261028-gallery192">
   <script type="importmap">{"imports":{"three":"./static/vendor/three/three.module.js","three/addons/":"./static/vendor/three/addons/"}}</script>
-  <script type="module" src="./static/app.js?v=20261028-gallery192"></script>
-  <script type="module" src="./static/portrait.js?v=20261028-gallery192"></script>
+  <script type="module" src="./static/app.js?v=20261029-room"></script>
+  <script type="module" src="./static/portrait.js?v=20261029-contribution"></script>
   <script type="module" src="./static/music.js?v=20261028-gallery192"></script>
   <script type="module" src="./static/scent.js?v=20261028-gallery192"></script>
   <script type="module" src="./static/exhibition.mjs?v=20261028-gallery192"></script>
+<link rel="stylesheet" href="static/room-controls.css?v=20261029-room">
+<link rel="stylesheet" href="static/contribution-feedback.css?v=20261029-contribution">
 </head>
 <body>
   <svg class="svg-definitions" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -81,7 +83,7 @@
             <strong id="portrait-piece-location"></strong>
           </div>
           <svg id="portrait-piece-guide" class="portrait-piece-guide" aria-hidden="true" hidden><path id="portrait-piece-line"/><circle id="portrait-piece-dot" r="3"/></svg>
-          <div id="portrait-arrival-note" class="portrait-arrival-note" aria-hidden="true" hidden><span>你的片段正在融入</span><strong id="portrait-arrival-location"></strong></div>
+          <div id="portrait-arrival-note" class="portrait-arrival-note" aria-hidden="true" hidden><span>新的片段正在融入</span><strong id="portrait-arrival-location"></strong></div>
           <div class="portrait-toolbar">
             <p id="portrait-controls-hint" class="portrait-controls-hint"><svg class="icon" aria-hidden="true"><use href="#icon-pointer"></use></svg><span>拖动旋转 · 滚轮缩放</span></p>
             <div class="portrait-actions">
@@ -103,7 +105,7 @@
             <div id="portrait-source-list" class="portrait-source-list" aria-label="本轮观众照片"></div>
             <div id="portrait-source-reference" class="portrait-source-reference" hidden>
               <canvas id="portrait-source-photo" width="160" height="196" role="img" aria-label="当前观众的原始照片局部"></canvas>
-              <div><strong id="portrait-source-name"></strong><span id="portrait-source-location"></span><small>原始照片局部 · 仅留在本次浏览</small></div>
+              <div><strong id="portrait-source-name"></strong><span id="portrait-source-location"></span><small>原始照片局部 · 对应当前作品</small></div>
             </div>
           </section>
           <section class="portrait-distribution" aria-labelledby="portrait-emotions-title">
@@ -258,7 +260,7 @@
 
     </div>
     <section id="capture-panel" class="view-panel" role="tabpanel" aria-labelledby="nav-capture" hidden>
-    <p class="capture-privacy">照片与表情分析仅在本浏览器处理，不上传；刷新会清空本轮。当前表情只在采集完成后加入群体。首次启用需要下载模型。</p>
+    <p class="capture-privacy">个人模式照片仅在本浏览器处理；教室房间在你同意后共享照片与分数。个人模式刷新会清空本轮。当前表情只在采集完成后加入群体。首次启用需要下载模型。</p>
     <div class="primary-grid">
       <section class="camera-section" aria-label="摄像头采集">
         <div class="preview">
@@ -327,5 +329,6 @@
       <p><a href="https://github.com/bybybye317-source/emotion-exhibition" target="_blank" rel="noopener noreferrer">GitHub 项目</a> · <a href="./THIRD_PARTY_NOTICES.md">素材与依赖说明</a></p>
     </footer>
   </main>
+<script type="module" src="static/contribution-feedback.mjs?v=20261029-contribution"></script>
 </body>
 </html>

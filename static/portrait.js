@@ -3,11 +3,11 @@ import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {createAlignedPhoto, paintCollage} from './portrait-collage.mjs?v=20261028-gallery192';
-import {ARRIVAL_SECONDS, FragmentArrival, blendCoveredPixels} from './portrait-arrival.mjs?v=20261028-gallery192';
+import {ARRIVAL_SECONDS, FragmentArrival, blendCoveredPixels, contributionMotion} from './portrait-arrival.mjs?v=20261029-contribution';
 import {LABELS, morphWeights, normalizeScores, planPatchAssignments} from './portrait-math.mjs?v=20261028-gallery192';
 
 import {calibratedProjection} from './portrait-features.mjs?v=20261028-real';
-import {ContributionGuide} from './portrait-contribution.mjs?v=20261028-gallery192';
+import {ContributionGuide} from './portrait-contribution.mjs?v=20261029-contribution';
 
 const $ = id => document.getElementById(id);
 const SIZE = 1024;
@@ -44,7 +44,8 @@ class GroupPortrait {
     this.arrivalMaskTexture=new THREE.CanvasTexture(this.arrivalMask);
     this.arrivalMaskTexture.flipY=true;this.arrivalMaskTexture.generateMipmaps=false;
     this.arrivalMaskTexture.minFilter=THREE.LinearFilter;
-    this.arrivalPhase='idle';this.contribution=new ContributionGuide(stage);
+    this.arrivalPhase='idle';this.progressPhase=null;this.pendingContributionId=null;this.arrivingParticipants=new Map();
+    this.contribution=new ContributionGuide(stage,()=>{if(!this.arrival.snapshot().active){this.paintArrivalMask([]);this.glowUniform.value=0;}this.updateStatus();});
     this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
     this.scene=new THREE.Scene();
     this.scene.background=new THREE.Color(getComputedStyle(stage).getPropertyValue('--portrait-stage-bg').trim() || '#080a0d');
@@ -75,6 +76,8 @@ class GroupPortrait {
     window.dispatchEvent(new Event('emotion:state-request'));
     this.revealListener=()=>this.resetView();
     window.addEventListener('portrait:reveal',this.revealListener);
+    this.locateListener=event=>this.replayContribution(event.detail?.participantId);
+    window.addEventListener('portrait:show-contribution',this.locateListener);
     this.loadModel();
     this.frameId=requestAnimationFrame(time=>this.animate(time));
   }
@@ -239,6 +242,10 @@ class GroupPortrait {
     const reconnected=connected&&!this.connected;
     this.connected=connected;
     this.records=(state.session.participants||[]).slice(-PORTRAIT_REGION_COUNT);
+    for(const [id] of this.arrivingParticipants)if(!this.records.some(record=>record.id===id)){
+      this.arrivingParticipants.delete(id);
+      window.dispatchEvent(new CustomEvent('portrait:contribution-progress',{detail:{participantId:id,phase:'unavailable',progress:0,active:false,fragmentIds:[]}}));
+    }
     this.scores=normalizeScores(state.session.group_scores);
     const signature=JSON.stringify(this.records.map(p=>[p.id,p.slot,p.image_url,p.photo_anchors]));
     if(signature!==this.signature) {
@@ -288,7 +295,8 @@ class GroupPortrait {
     if(this.records.length)detail=`${this.loadedCount*6} / 192 片已融入 · 点击观众照片，定位 6 个碎片。`;
     const arrival=this.arrival.snapshot();
 
-    if(arrival.active){status='你的片段正在融入';detail=`${this.arrivalLocation()}正在慢慢浮现，柔光会在融入后散去。`;}
+    if(arrival.active){status='六个碎片正在融入共同肖像';detail=`${this.arrivalLocation()} · 对照编号，看清照片怎样进入大脸。`;}
+    else if(this.contribution.pinned){status='已定位这位观众的六个碎片';detail='左侧照片与大脸使用相同编号；点击「收起定位」返回整体。';}
     if(this.loadingPhotos) status='正在将新片段拼入肖像…';
     else if(this.loadedCount<this.records.length) status=`已拼入 ${this.loadedCount}/${this.records.length} 块；部分照片不可用`;
     if(this.preview!=='group') status=`预览：${LABELS[this.preview]} · 不改变采集数据`;
@@ -357,43 +365,73 @@ class GroupPortrait {
     this.texture.needsUpdate=true;this.coverageTexture.needsUpdate=true;this.presentedKeys=nextKeys;
     if(!immediate&&!removed&&revealSlots.length) {
       this.lastArrivalSlots=revealSlots;
+      for(const slot of revealSlots){const record=this.records.find(record=>record.slot===slot);if(record)this.arrivingParticipants.set(record.id,slot);}
       this.arrival.begin(revealSlots,{reducedMotion:this.reducedMotion.matches});
       this.paintArrivalMask(revealSlots);this.arrivalUniform.value=0;this.glowUniform.value=0;
-      this.photoUniform.value=1;this.prepareContribution(revealSlots.at(-1));
+      this.photoUniform.value=1;this.prepareContribution(revealSlots.at(-1));this.progressPhase=null;
     } else {
-      this.arrival.clear();this.contribution.clear();this.arrivalUniform.value=1;this.glowUniform.value=0;
+      this.arrival.clear();this.contribution.clear();this.pendingContributionId=null;this.progressPhase=null;this.arrivalUniform.value=1;this.glowUniform.value=0;
       this.snapshotAppearance();this.paintArrivalMask([]);
       if(!this.records.length)this.lastArrivalSlots=[];
     }
     this.syncArrivalDisplay(this.arrival.snapshot());
+    if(this.pendingContributionId&&this.records.some(r=>r.id===this.pendingContributionId&&this.photoCache.has(photoKey(r)))){const id=this.pendingContributionId;this.pendingContributionId=null;this.replayContribution(id);}
   }
 
   prepareContribution(slot,replay=false) {
     const patch=planPatchAssignments(this.records)[slot],record=this.records[patch?.recordIndex];
     if(record)this.sources.select(record.id);
-    this.contribution.show({image:record&&this.photoCache.get(photoKey(record)),slot,head:this.head,location:`${sourceLabel(record,this.records.indexOf(record))} · 6 片分散融入`,replay});
+    this.contribution.show({image:record&&this.photoCache.get(photoKey(record)),slot,head:this.head,participantId:record?.id,location:`${sourceLabel(record,this.records.indexOf(record))} · 6 个真实位置`,replay});
   }
 
   replayContribution(id) {
     const record=[...this.records].reverse().find(record=>(!id||record.id===id)&&this.photoCache.has(photoKey(record)));
-    if(!record||!this.ready)return;
+    // The arrival clock pauses offscreen. A queued location request must reveal
+    // the stage immediately too, especially below the mobile feedback panel.
+    if(record||this.records.some(candidate=>candidate.id===id)){
+      const rect=this.stage.getBoundingClientRect();
+      if(document.body.dataset.view!=='gallery'||Math.min(rect.bottom,innerHeight)-Math.max(rect.top,0)<Math.min(180,rect.height*.35))$('portrait-workspace').scrollIntoView({behavior:'instant',block:'center'});
+    }
+    if(!record||!this.ready){
+      if(id){this.pendingContributionId=this.records.some(r=>r.id===id)?id:null;window.dispatchEvent(new CustomEvent('portrait:contribution-progress',{detail:{participantId:id,phase:this.pendingContributionId?'waiting':'unavailable',progress:0,active:false,fragmentIds:[]}}));}
+      return;
+    }
+    // An explicit location request must not finish another visitor's ongoing
+    // fade. Retain the requested identity and replay after that fade completes.
+    if(this.arrival.snapshot().active){
+      if(this.contribution.participantId===record.id){this.pendingContributionId=null;return;}
+      this.pendingContributionId=record.id;
+      window.dispatchEvent(new CustomEvent('portrait:contribution-progress',{detail:{participantId:record.id,phase:'waiting',progress:0,active:false,fragmentIds:fragmentsForOwner(record.slot)}}));
+      return;
+    }
+    this.pendingContributionId=null;this.progressPhase=null;this.arrivingParticipants.set(record.id,record.slot);
     this.snapshotAppearance();this.lastArrivalSlots=[record.slot];this.resetView();
     this.arrival.begin([record.slot],{reducedMotion:this.reducedMotion.matches});this.paintArrivalMask([record.slot]);
     // Replay is a guide only: both atlases hold the already settled face.
     this.fromContext.clearRect(0,0,SIZE,SIZE);this.fromContext.drawImage(this.atlas,0,0);this.fromTexture.needsUpdate=true;
     this.fromCoverageContext.clearRect(0,0,SIZE,SIZE);this.fromCoverageContext.drawImage(this.coverage,0,0);this.fromCoverageTexture.needsUpdate=true;
     this.prepareContribution(record.slot,true);this.syncArrivalDisplay(this.arrival.snapshot());
-    const rect=this.stage.getBoundingClientRect();
-    if(document.body.dataset.view!=='gallery'||rect.bottom<180||rect.top>innerHeight-180)$('portrait-workspace').scrollIntoView({behavior:'instant',block:'center'});
   }
 
   syncArrivalDisplay(arrival) {
-    this.arrivalUniform.value=arrival.mix;this.glowUniform.value=arrival.glow;
+    this.arrivalUniform.value=arrival.mix;this.glowUniform.value=!arrival.active&&this.contribution.pinned?.55:arrival.glow;
     const note=$('portrait-arrival-note');note.hidden=!arrival.active;
     if(arrival.active) {
       const location=this.arrivalLocation();
       if($('portrait-arrival-location').textContent!==location)$('portrait-arrival-location').textContent=location;
       note.style.opacity=String(this.reducedMotion.matches?1:Math.min(1,(ARRIVAL_SECONDS-arrival.elapsed)/.5));
+    }
+    const phase=contributionMotion(arrival.elapsed,{active:arrival.active,reduced:this.reducedMotion.matches}).stage;
+    if(`${phase}:${arrival.active}`!==this.progressPhase){
+      this.progressPhase=`${phase}:${arrival.active}`;
+      for(const [participantId,slot] of this.arrivingParticipants){
+        // A later join may continue an interrupted earlier dissolve. Only
+        // announce completion when that retained photo has really settled.
+        if(arrival.active&&!this.lastArrivalSlots.includes(slot))continue;
+        if(!this.records.some(record=>record.id===participantId&&record.slot===slot))continue;
+        window.dispatchEvent(new CustomEvent('portrait:contribution-progress',{detail:{participantId,phase,progress:arrival.mix,active:arrival.active,fragmentIds:fragmentsForOwner(slot)}}));
+      }
+      if(!arrival.active)this.arrivingParticipants.clear();
     }
     this.stage.dataset.arrivalPhase=arrival.phase;
     this.stage.dataset.arrivalMix=arrival.mix.toFixed(3);
@@ -447,6 +485,11 @@ class GroupPortrait {
       this.photoRetryTimer=setTimeout(()=>{
         if(generation===this.generation&&this.connected&&!this.disposed)this.loadPhotos(records);
       },this.photoRetries*1500);
+    } else if(this.loadedCount<records.length) {
+      for(const record of this.records.filter(record=>!this.photoCache.has(photoKey(record)))){
+        window.dispatchEvent(new CustomEvent('portrait:contribution-progress',{detail:{participantId:record.id,phase:'error',progress:0,active:false,fragmentIds:[]}}));
+        if(record.id===this.pendingContributionId)this.pendingContributionId=null;
+      }
     }
   }
 
@@ -459,7 +502,10 @@ class GroupPortrait {
     const wasActive=this.arrival.snapshot().active;
     const arrival=this.arrival.advance(delta,{visible,reducedMotion:this.reducedMotion.matches});
     if(wasActive||arrival.active)this.syncArrivalDisplay(arrival);
-    if(wasActive&&!arrival.active){this.snapshotAppearance();this.paintArrivalMask([]);if(!this.reducedMotion.matches)this.contribution.clear();}
+    if(wasActive&&!arrival.active){
+      this.snapshotAppearance();if(this.contribution.pinned){this.glowUniform.value=.55;}else{this.paintArrivalMask([]);if(!this.reducedMotion.matches)this.contribution.clear();}
+      if(this.pendingContributionId){const id=this.pendingContributionId;this.pendingContributionId=null;this.replayContribution(id);}
+    }
     if(document.hidden||rect.width<1)return;
     const alpha=1-Math.exp(-delta/(this.reducedMotion.matches?.45:.65));
     for(const mesh of this.morphMeshes)for(const [name,index] of Object.entries(mesh.morphTargetDictionary)) {
@@ -471,7 +517,7 @@ class GroupPortrait {
     // A gentle oscillation keeps the open sculptural mask facing the viewer.
     this.controls.autoRotate=false;
     if(this.model) {
-      const target=this.autoRotate&&!this.reducedMotion.matches&&!arrival.active?Math.sin(time*.00016)*.20:0;
+      const target=this.autoRotate&&!this.reducedMotion.matches&&!arrival.active&&!this.contribution.pinned?Math.sin(time*.00016)*.20:0;
       this.model.rotation.y+=(target-this.model.rotation.y)*(1-Math.exp(-delta/1.4));
     }
     this.controls.update(delta);
@@ -499,6 +545,7 @@ class GroupPortrait {
     this.scene.traverse(o=>{o.geometry?.dispose();o.material?.dispose();});this.renderer.dispose();
     window.removeEventListener('emotion:state',this.listener);
     window.removeEventListener('portrait:reveal',this.revealListener);
+    window.removeEventListener('portrait:show-contribution',this.locateListener);
   }
 }
 

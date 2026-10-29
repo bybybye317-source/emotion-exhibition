@@ -1,3 +1,4 @@
+import {createRoomControls} from './room-controls.mjs?v=20261029-room';
 import {BrowserEmotionAnalyzer} from './browser-inference.mjs?v=20261028-anatomy';
 import {LocalSession, EMOTION_KEYS} from './session-state.mjs?v=20261028-gallery192';
 import {CAPTURE_POLICY, CAPTURE_DURATION_LABEL, CaptureWindow} from './capture-window.mjs?v=20261028-fast';
@@ -12,8 +13,13 @@ let disposed=false,initPromise=null,cameraGeneration=0,stream=null,loopTimer=nul
 let testingImage=false,testedImage=null,testPreviewUrl=null,recordSignature='';
 const frame=document.createElement('canvas');
 const frameContext=frame.getContext('2d',{willReadFrequently:true});
-const pending=()=>state.camera.status==='starting'||testingImage;
-const emit=()=>window.dispatchEvent(new CustomEvent('emotion:state',{detail:{state:structuredClone(state),connected:true}}));
+let submitting=false;
+let renderedCohort='local';
+const room=createRoomControls({onState:()=>{render();},onError:error,isBusy:()=>Boolean(captureRun)||testingImage||submitting||state.camera.status==='starting'});
+const currentSession=()=>room.snapshot?.session||session.snapshot();
+const pending=()=>state.camera.status==='starting'||testingImage||submitting||room.busy;
+const cohortId=()=>room.active?`${room.roomId}:${room.snapshot?.generation??0}`:'local';
+const emit=()=>window.dispatchEvent(new CustomEvent('emotion:state',{detail:{state:structuredClone(state),connected:true,scope:room.active?'room':'local',cohortId:cohortId()}}));
 function error(message='') {$('action-error').hidden=!message;$('action-error').textContent=message;}
 function makeRows(id) {
   const root=$(id);root.replaceChildren();const rows={};
@@ -28,21 +34,27 @@ function scoresToRows(rows,scores={}) {
 function controls(){
   const running=state.camera.status==='running', capturing=Boolean(captureRun);
   $('start-camera').disabled=running||pending();$('stop-camera').disabled=!running&&state.camera.status!=='starting';
-  $('capture').disabled=!running||state.model.status!=='ready'||capturing||state.live.status!=='ok';
-  $('reset-session').disabled=!session.records.length||capturing;
-  $('test-file').disabled=testingImage||capturing;
-  $('test-image').disabled=testingImage||capturing||!$('test-file').files.length;
-  $('add-image').disabled=testingImage||!testedImage;
+  $('capture').disabled=!running||state.model.status!=='ready'||capturing||pending()||state.live.status!=='ok';
+  $('reset-session').disabled=!currentSession().participants.length||capturing||pending()||(room.active&&room.role!=='host');
+  $('test-file').disabled=testingImage||capturing||submitting;
+  $('test-image').disabled=testingImage||capturing||submitting||!$('test-file').files.length;
+  $('add-image').disabled=testingImage||submitting||!testedImage;
   $('start-camera').querySelector('span').textContent=state.camera.status==='starting'?'正在准备…':running?'摄像头已开启':'开启摄像头';
   $('capture-label').textContent=capturing?'正在采集…':state.capture.status==='completed'?'采集下一位':`采集 ${CAPTURE_DURATION_LABEL}`;
   $('test-image').textContent=testingImage?'正在分析…':'分析图片';
 }
 function render(){
   if(disposed)return;
-  state.session=session.snapshot();
+  state.session=currentSession();
+  const nextCohort=cohortId();
+  if(nextCohort!==renderedCohort){
+    renderedCohort=nextCohort;
+    const preview=$('artwork-preview');
+    preview.value='group';preview.dispatchEvent(new Event('change'));
+  }
   const running=state.camera.status==='running', starting=state.camera.status==='starting';
   $('connection').classList.toggle('connected',running);$('connection').classList.toggle('problem',state.camera.status==='error');
-  $('connection-text').textContent=running?'浏览器摄像头运行中':starting?'正在准备识别':state.camera.status==='error'?'摄像头不可用':'浏览器本地体验';
+  $('connection-text').textContent=running?'浏览器摄像头运行中':starting?'正在准备识别':state.camera.status==='error'?'摄像头不可用':room.active?'教室房间 · 共同作品':'浏览器本地体验';
   video.hidden=!stream;$('camera-placeholder').hidden=Boolean(stream);
   $('camera-placeholder-title').textContent=starting?'正在准备摄像头与模型':state.camera.status==='error'?'摄像头暂不可用':'摄像头尚未开启';
   $('camera-placeholder-detail').textContent=state.camera.detail||'照片在你的浏览器内处理，也可以使用下方照片参与';
@@ -53,10 +65,10 @@ function render(){
   $('preview-badge').hidden=!running;$('preview-badge').textContent=valid?'检测到一张人脸':'等待有效人脸';
   $('capture-detail').textContent=state.capture.detail;$('capture-detail').className=state.capture.status;
   $('capture-progress').hidden=!captureRun;$('capture-progress').setAttribute('aria-valuenow',String(Math.round(state.capture.progress*100)));$('capture-progress-fill').style.width=`${state.capture.progress*100}%`;
-  $('model-status').textContent=state.model.status==='ready'?'enet_b0_8_best_afew · 浏览器 WASM · 照片不上传':state.model.detail;
+  $('model-status').textContent=state.model.status==='ready'?(room.active?'enet_b0_8_best_afew · 本地识别 · 同意后共享照片':'enet_b0_8_best_afew · 浏览器 WASM · 照片不上传'):state.model.detail;
   const count=state.session.participant_count;$('participant-count').textContent=`${count} 人`;$('records-empty').hidden=Boolean(count);$('participant-list').hidden=!count;$('group-empty').hidden=Boolean(count);$('group-scores').hidden=!count;scoresToRows(groupRows,state.session.group_scores);
-  const signature=session.records.map(p=>p.id).join('|');
-  if(signature!==recordSignature){recordSignature=signature;$('participant-list').replaceChildren(...session.records.slice().reverse().map((p,i)=>{const li=document.createElement('li');li.className='participant-item';const img=document.createElement('img');img.className='participant-image';img.alt=`本轮参与者 ${count-i}`;img.src=p.image_url;const text=document.createElement('p');text.textContent=`#${String(count-i).padStart(2,'0')} · ${labels[p.emotion]}`;const time=document.createElement('time');time.textContent=new Date(p.time).toLocaleTimeString('zh-CN');li.append(img,text,time);return li;}));}
+  const signature=state.session.participants.map(p=>p.id).join('|');
+  if(signature!==recordSignature){recordSignature=signature;$('participant-list').replaceChildren(...state.session.participants.slice().reverse().map((p,i)=>{const li=document.createElement('li');li.className='participant-item';const img=document.createElement('img');img.className='participant-image';img.alt=`本轮参与者 ${count-i}`;img.src=p.image_url;const text=document.createElement('p');text.textContent=`#${String(count-i).padStart(2,'0')} · ${labels[p.emotion]}`;const time=document.createElement('time');time.textContent=new Date(p.time).toLocaleTimeString('zh-CN');li.append(img,text,time);return li;}));}
   controls();emit();
 }
 async function ensureModel(){
@@ -115,7 +127,7 @@ $('capture').addEventListener('click',()=>{
   if(captureRun||state.camera.status!=='running'||state.live.status!=='ok')return;
   const run=new CaptureWindow({startedAt:performance.now(),scoreKeys:EMOTION_KEYS});
   captureRun=run;state.capture={status:'capturing',detail:`请保持一位观众正对镜头，采集 ${CAPTURE_DURATION_LABEL}。`,progress:0};render();
-  const finishCapture=()=>{
+  const finishCapture=async()=>{
     if(captureRun!==run||disposed)return;
     const result=run.finish(performance.now());
     if(result.status==='pending'){captureTimer=setTimeout(finishCapture,result.remainingMs);return;}
@@ -126,12 +138,11 @@ $('capture').addEventListener('click',()=>{
         : `有效画面 ${result.frameCount||0} 帧，至少需要 ${CAPTURE_POLICY.minFrames} 帧。请保持稳定重试。`;
       state.capture={status:'rejected',progress:0,detail};render();return;
     }
-    session.add({scores:result.scores,photoUrl:URL.createObjectURL(result.photo.blob),anchors:result.photo.anchors});
-    state.capture={status:'completed',progress:1,detail:'采集完成，正在展示你贡献的片段。'};revealContribution();
+    await addContribution({scores:result.scores,blob:result.photo.blob,anchors:result.photo.anchors});
   };
   captureTimer=setTimeout(finishCapture,CAPTURE_POLICY.durationMs);
 });
-$('reset-session').addEventListener('click',()=>{if(!session.records.length)return;if(confirm('清空当前浏览器本轮照片与记录？')){cancelCapture();session.reset();state.capture={status:'idle',detail:'本轮已清空，可以重新参与。',progress:0};render();}});
+$('reset-session').addEventListener('click',async()=>{if(!currentSession().participants.length||submitting)return;if(confirm(room.active?'清空这个教室房间的所有照片与记录？所有参与设备都会同步清空。':'清空当前浏览器本轮照片与记录？')){cancelCapture();try{if(room.active)await room.reset();else session.reset();state.capture={status:'idle',detail:'本轮已清空，可以重新参与。',progress:0};render();}catch(e){error(e.message);}}});
 function clearTest(){testedImage=null;$('add-image').disabled=true;if(testPreviewUrl)URL.revokeObjectURL(testPreviewUrl);testPreviewUrl=null;$('test-preview').removeAttribute('src');$('image-test-result').hidden=true;scoresToRows(imageRows,{});}
 $('test-file').addEventListener('change',()=>{clearTest();controls();});
 $('image-test-form').addEventListener('submit',async event=>{
@@ -150,8 +161,29 @@ $('image-test-form').addEventListener('submit',async event=>{
   }catch(e){$('image-test-detail').textContent=`图片分析未完成：${e.message}`;}
   finally{bitmap?.close();testingImage=false;controls();render();}
 });
-$('add-image').addEventListener('click',()=>{
-  if(!testedImage)return;session.add({scores:testedImage.scores,photoUrl:URL.createObjectURL(testedImage.blob),anchors:testedImage.anchors});testedImage=null;$('image-test-detail').textContent='已加入当前群体作品，可以继续添加下一位。';state.capture={status:'completed',progress:1,detail:'照片已加入作品，正在展示你贡献的片段。'};revealContribution();
+async function addContribution({blob,scores,anchors}){
+ if(submitting)return false;submitting=true;error();const before=structuredClone(currentSession());render();
+ try{
+  const participantId=room.active?await room.submit({blob,scores,anchors}):session.add({scores,photoUrl:URL.createObjectURL(blob),anchors});
+  state.capture={status:'completed',progress:1,detail:room.active?'已同步到教室大屏，正在展示你的六片贡献。':'已加入作品，正在展示你的六片贡献。'};
+  revealContribution();
+  const after=structuredClone(currentSession());
+  window.dispatchEvent(new CustomEvent('emotion:contribution',{detail:{participantId,before,after,isOwn:true,scope:room.active?'room':'local',cohortId:cohortId()}}));
+  // A server snapshot may include a later simultaneous arrival. Queue the
+  // submitter's exact six-piece guide rather than showing someone else's map.
+  if(after.participants.at(-1)?.id!==participantId)window.dispatchEvent(new CustomEvent('portrait:show-contribution',{detail:{participantId}}));
+  requestAnimationFrame(()=>{
+    const stage=$('portrait-stage'),rect=stage.getBoundingClientRect();
+    const visible=Math.max(0,Math.min(rect.bottom,innerHeight)-Math.max(rect.top,0));
+    if(visible<Math.min(rect.height*.65,innerHeight*.55))$('portrait-workspace').scrollIntoView({behavior:'instant',block:'center'});
+  });
+  return true;
+ }catch(e){state.capture={status:'rejected',progress:0,detail:`${room.active?'尚未确认加入':'未加入作品'}：${e.message}`};error(e.message);return false;}
+ finally{submitting=false;render();}
+}
+$('add-image').addEventListener('click',async()=>{
+ if(!testedImage||submitting)return;const item=testedImage;
+ if(await addContribution(item)){testedImage=null;$('image-test-detail').textContent='已加入群体作品，可以继续添加下一位。';controls();}
 });
 const views=['gallery','portrait','music','scent','capture'];const viewTitles={gallery:'共感展厅',portrait:'群体肖像',music:'群体声景',scent:'群体气味',capture:'参与作品'};
 function selectView(name,focus=false){
@@ -166,7 +198,8 @@ function selectView(name,focus=false){
  $('gallery-emotions').hidden=name==='capture';
  $('page-title').textContent=viewTitles[name];document.title=`${viewTitles[name]} · 机器如何理解人类的情绪`;
  window.dispatchEvent(new Event('resize'));
- if(location.hash!==`#${name}-panel`)history.replaceState(null,'',`#${name}-panel`);
+ const roomQuery=location.hash.split('?')[1];const target=`#${name}-panel${roomQuery?'?'+roomQuery:''}`;
+ if(location.hash!==target)history.replaceState(null,'',target);
  window.dispatchEvent(new CustomEvent('exhibition:view',{detail:{view:name}}));
 }
 function revealContribution(){
@@ -182,7 +215,7 @@ function revealContribution(){
   window.scrollTo({top:0,behavior:'instant'});
   window.dispatchEvent(new Event('portrait:reveal'));
 }
-function selectHashView(){const name=location.hash.replace(/^#/, '').replace(/-panel$/, '');selectView(views.includes(name)?name:'gallery');}
+function selectHashView(){const name=location.hash.split('?')[0].replace(/^#/, '').replace(/-panel$/, '');selectView(views.includes(name)?name:'gallery');}
 window.addEventListener('hashchange',selectHashView);
 for(const [i,name] of views.entries()){
   $(`nav-${name}`).addEventListener('click',()=>selectView(name));
@@ -193,7 +226,7 @@ document.querySelectorAll('[data-focus-view]').forEach(button=>button.addEventLi
 window.addEventListener('emotion:state-request',emit);
 const tick=setInterval(()=>{if(captureRun){state.capture.progress=captureRun.progress(performance.now());render();}},100);
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&(stream||state.camera.status==='starting'))stopCamera('页面离开前台，摄像头和本次采集已停止。');});
-window.addEventListener('pagehide',event=>{stopCamera();if(event.persisted)return;disposed=true;clearInterval(tick);session.reset();clearTest();analyzer.dispose?.();});
+window.addEventListener('pagehide',event=>{stopCamera();if(event.persisted)return;disposed=true;clearInterval(tick);session.reset();room.dispose();clearTest();analyzer.dispose?.();});
 selectHashView();render();
 // A fragment URL names the view; it must not scroll the shared emotion band away.
 requestAnimationFrame(()=>requestAnimationFrame(()=>window.scrollTo({top:0,behavior:'instant'})));

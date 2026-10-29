@@ -46,10 +46,10 @@ test('bad feature tracking cannot invert the baseline lip-constrained warp',()=>
 });
 test('contribution remains readable at source, travels before merging, and fades out at its destination',()=>{
  const begin=contributionMotion(.4);assert.equal(begin.travel,0);assert.equal(begin.opacity,1);assert.equal(begin.stage,'source');
- const flight=contributionMotion(1);assert(flight.travel>0&&flight.travel<1);assert.equal(flight.stage,'travelling');
- assert.equal(contributionMotion(1.5).travel,1);assert.equal(contributionMotion(2).opacity,0);
- assert.equal(contributionMotion(3.2).line,0);
- const arrival=new FragmentArrival();arrival.begin([4]);assert.equal(arrival.advance(.65).mix,0,'do not replace face before source has been shown');assert(arrival.advance(.6).mix>0);
+ const flight=contributionMotion(2);assert(flight.travel>0&&flight.travel<1);assert.equal(flight.stage,'travelling');
+ assert.equal(contributionMotion(2.7).travel,1);assert.equal(contributionMotion(4).opacity,0);
+ assert.equal(contributionMotion(8.4).line,0);
+ const arrival=new FragmentArrival();arrival.begin([4]);assert.equal(arrival.advance(1.1).mix,0,'do not replace face before source has been shown');assert(arrival.advance(.6).mix>0);
 });
 test('hidden, cleared and reduced-motion contributions cannot leave a flying photograph behind',()=>{
  for(const state of [{active:false},{reduced:true}]){

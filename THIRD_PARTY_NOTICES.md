@@ -1,9 +1,10 @@
 # 素材与依赖说明
 
-核验日期：2026-10-28。下述许可证各自适用于对应的第三方文件，不将整站或模型权重一并重新授权。
+核验日期：2026-10-29。下述许可证各自适用于对应的第三方文件，不将整站或模型权重一并重新授权。
 
 | 组件 | 来源 / 固定版本 | 许可与记录 |
 |---|---|---|
+| 房间二维码 | qrcode-generator 1.4.4 | MIT，Copyright (c) 2009 Kazuhiko Arase；[许可证](static/vendor/qrcode-LICENSE.txt)，二维码在本地生成 |
 | Three.js 与 OrbitControls | Three.js r180，提交 `0af9729d0c143a86a1d725d6e2c3ad83301f3f34` | MIT，Copyright 2010–2025 three.js authors；[许可证](static/vendor/three/LICENSE) |
 | 雕塑面罩与表情形态 | [FaceCapCustomAvatarExporter / Example.FCA](https://github.com/hizzlehoff/FaceCapCustomAvatarExporter)，提交 `86a89d247624e7b5e393e4336709e490db717382` | MIT，Copyright (c) 2020 Niels J.；[许可证](static/models/sculpture-head-LICENSE.txt)、[来源与修改](static/models/sculpture-head-README.md) |
 | meshoptimizer 解码器 | 0.22，随原供应商目录保留，运行时三维脸不使用 | MIT；[许可证](static/vendor/three/MESHOPT-LICENSE) |
@@ -18,4 +19,4 @@
 
 在线版雕塑面罩来自 Face Cap 作者明确采用 MIT 的示例仓库，转换并细分后保留 43 个表情形态；没有使用本地早期 Demo 中来源不同的 FaceCap GLB。网站不包含真实观众照片；测试中使用的公开照片未打包或提交。
 
-照片和分数不上传、不持久化。模型下载请求只获取运行库或模型，实际输入在浏览器内处理。GitHub Pages 会按照 GitHub 自身政策处理普通网站访问日志。
+个人模式的照片和分数不上传、不持久化。教室房间模式须勾选共享同意才上传照片与分数至房间服务；最新 32 条保存在 D1，2 小时后不可访问，过期行在后续 API 请求时清理。主持人清空或结束会立即删除对应照片记录。房间链接包含访问凭据，持有链接的人可查看，勿公开转发。模型下载请求只获取运行库或模型，实际输入在浏览器内处理。GitHub Pages 会按照 GitHub 自身政策处理普通网站访问日志。

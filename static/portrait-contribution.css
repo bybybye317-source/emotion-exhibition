@@ -1,0 +1,16 @@
+/* Contribution localization uses the real aligned photo and the actual UV cells. */
+.portrait-piece-card.portrait-contribution-card{background:#090b0ed9;border:1px solid #8f806343;backdrop-filter:blur(9px);width:154px;padding:10px;box-shadow:0 10px 40px #0002}
+.portrait-contribution-card .portrait-piece-image{height:auto;aspect-ratio:1;margin:9px 0;position:relative}
+.portrait-contribution-map{display:block;width:100%;height:100%;border-radius:2px}
+.portrait-contribution-card .portrait-contribution-caption{display:block;font-size:9px;line-height:1.6;color:#9c9c9f;margin-top:5px;letter-spacing:.04em}
+.portrait-contribution-card .portrait-piece-location{font-size:10px}
+.portrait-contribution-close{appearance:none;border:0;border-top:1px solid #80725635;color:#cfbd98;background:none;width:100%;padding:8px 0 0;margin-top:7px;font:inherit;font-size:10px;cursor:pointer;pointer-events:auto;text-align:left}
+.portrait-contribution-close:focus-visible{outline:1px solid #cfbd98;outline-offset:3px}
+.portrait-piece-guide .portrait-piece-number{fill:#eee5d4;font:11px Arial,sans-serif;text-anchor:middle;dominant-baseline:central;paint-order:stroke;stroke:#08090b;stroke-width:3px}
+.portrait-piece-guide .portrait-piece-target{fill:#17191de6;stroke:#c8b78f;stroke-width:1}
+body[data-view=gallery] .portrait-piece-card.portrait-contribution-card{width:120px;left:10px;top:10px;padding:8px}
+body[data-view=gallery] .portrait-contribution-card .portrait-piece-image{height:auto;margin:7px 0;aspect-ratio:1}
+body[data-view=gallery] .portrait-contribution-card .portrait-contribution-caption{font-size:8px}
+body[data-view=gallery] .portrait-contribution-card .portrait-contribution-close{font-size:9px}
+body[data-view=gallery] .portrait-contribution-card strong{font-size:9px;line-height:1.5}
+@media(max-width:600px){body[data-view=gallery] .portrait-piece-card.portrait-contribution-card,.portrait-piece-card.portrait-contribution-card{width:98px;left:8px;top:8px;padding:7px}.portrait-contribution-card .portrait-contribution-caption{font-size:8px}.portrait-piece-guide .portrait-piece-number{font-size:9px}.portrait-contribution-card .portrait-contribution-close{font-size:9px;padding-top:6px}.portrait-contribution-card #portrait-piece-location{font-size:8px}}

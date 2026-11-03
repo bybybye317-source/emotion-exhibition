@@ -1,19 +1,21 @@
-import {createRoomControls} from './room-controls.mjs?v=20261029-room';
+import {createRoomControls} from './room-controls.mjs?v=20261103-connection';
 import {BrowserEmotionAnalyzer} from './browser-inference.mjs?v=20261028-anatomy';
 import {LocalSession, EMOTION_KEYS} from './session-state.mjs?v=20261028-gallery192';
-import {CAPTURE_POLICY, CAPTURE_DURATION_LABEL, CaptureWindow} from './capture-window.mjs?v=20261028-fast';
+import {CAPTURE_POLICY, CAPTURE_DURATION_LABEL, CaptureWindow} from './capture-window.mjs?v=20261103-auto';
+import {AutoCaptureGate} from './auto-capture.mjs?v=20261103-auto';
 
 const $=id=>document.getElementById(id);
 const labels={happiness:'快乐',neutral:'中性',sadness:'悲伤',surprise:'惊讶',anger:'愤怒',fear:'恐惧',disgust:'厌恶',contempt:'轻蔑'};
 const video=$('camera-stream');
 const analyzer=new BrowserEmotionAnalyzer();
 const session=new LocalSession({onRelease:url=>URL.revokeObjectURL(url)});
-const state={camera:{status:'off'},model:{status:'unloaded',detail:'浏览器内推理 · 点击后加载'},live:{status:'waiting',scores:{}},capture:{status:'idle',detail:'开启摄像头，或使用下方照片参与。',progress:0},session:session.snapshot()};
+const state={camera:{status:'off'},model:{status:'unloaded',detail:'浏览器内推理 · 点击后加载'},live:{status:'waiting',scores:{}},capture:{status:'idle',detail:'开启摄像头后，检测到清晰人脸就会自动采集一次。',progress:0},session:session.snapshot()};
 let disposed=false,initPromise=null,cameraGeneration=0,stream=null,loopTimer=null,captureTimer=null,captureRun=null;
 let testingImage=false,testedImage=null,testPreviewUrl=null,recordSignature='';
 const frame=document.createElement('canvas');
 const frameContext=frame.getContext('2d',{willReadFrequently:true});
-let submitting=false;
+let submitting=false,cameraRetry=null;
+const autoCapture=new AutoCaptureGate();
 let renderedCohort='local';
 const room=createRoomControls({onState:()=>{render();},onError:error,isBusy:()=>Boolean(captureRun)||testingImage||submitting||state.camera.status==='starting'});
 const currentSession=()=>room.snapshot?.session||session.snapshot();
@@ -34,13 +36,13 @@ function scoresToRows(rows,scores={}) {
 function controls(){
   const running=state.camera.status==='running', capturing=Boolean(captureRun);
   $('start-camera').disabled=running||pending();$('stop-camera').disabled=!running&&state.camera.status!=='starting';
-  $('capture').disabled=!running||state.model.status!=='ready'||capturing||pending()||state.live.status!=='ok';
+  $('capture').disabled=capturing||pending()||(room.requested&&!room.ready)||(!cameraRetry&&(!running||state.model.status!=='ready'||state.live.status!=='ok'));
   $('reset-session').disabled=!currentSession().participants.length||capturing||pending()||(room.active&&room.role!=='host');
   $('test-file').disabled=testingImage||capturing||submitting;
   $('test-image').disabled=testingImage||capturing||submitting||!$('test-file').files.length;
-  $('add-image').disabled=testingImage||submitting||!testedImage;
-  $('start-camera').querySelector('span').textContent=state.camera.status==='starting'?'正在准备…':running?'摄像头已开启':'开启摄像头';
-  $('capture-label').textContent=capturing?'正在采集…':state.capture.status==='completed'?'采集下一位':`采集 ${CAPTURE_DURATION_LABEL}`;
+  $('add-image').disabled=testingImage||submitting||(room.requested&&!room.ready)||!testedImage;
+  $('start-camera').querySelector('span').textContent=state.camera.status==='starting'?'正在准备…':running?'摄像头已开启':'开启摄像头并自动采集';
+  $('capture-label').textContent=capturing?'正在采集…':cameraRetry?'重试加入作品':'手动再采一次';
   $('test-image').textContent=testingImage?'正在分析…':'分析图片';
 }
 function render(){
@@ -48,7 +50,7 @@ function render(){
   state.session=currentSession();
   const nextCohort=cohortId();
   if(nextCohort!==renderedCohort){
-    renderedCohort=nextCohort;
+    renderedCohort=nextCohort;cameraRetry=null;autoCapture.cancel();cancelCapture('房间或本轮已更新，请重新采集。');
     const preview=$('artwork-preview');
     preview.value='group';preview.dispatchEvent(new Event('change'));
   }
@@ -80,10 +82,10 @@ async function ensureModel(){
 const blobFromCanvas=canvas=>new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('照片生成失败')),'image/jpeg',.94));
 function cancelCapture(detail='采集已停止。'){
   clearTimeout(captureTimer);captureTimer=null;captureRun?.cancel();captureRun=null;
-  if(state.capture.status==='capturing')state.capture={status:'idle',detail,progress:0};
+  if(state.capture.status==='capturing'||state.capture.status==='waiting')state.capture={status:'idle',detail,progress:0};
 }
 function stopCamera(detail='摄像头已停止，照片记录仍保留在本轮。'){
-  ++cameraGeneration;clearTimeout(loopTimer);loopTimer=null;cancelCapture(detail);
+  ++cameraGeneration;autoCapture.cancel();clearTimeout(loopTimer);loopTimer=null;cancelCapture(detail);
   if(stream)for(const track of stream.getTracks())track.stop();stream=null;video.srcObject=null;
   state.camera={status:'off'};state.live={status:'waiting',scores:{},detail:'等待开启摄像头'};render();
 }
@@ -98,6 +100,7 @@ async function cameraLoop(generation){
     const result=await analyzer.analyze(frame);
     if(disposed||generation!==cameraGeneration)return;
     state.live={...result,last_update:Date.now()/1000};
+    if(autoCapture.claim({validFace:result.status==='ok',modelReady:state.model.status==='ready',canSubmit:!room.requested||(room.ready&&room.sharingConsent),busy:!!captureRun||submitting||room.busy}))beginCapture({automatic:true});
     if(run&&captureRun===run){
       const token=run.recordFrame({startedAt:frameStartedAt,completedAt:performance.now(),result});
       if(token&&run.needsPhoto(token)){
@@ -110,39 +113,61 @@ async function cameraLoop(generation){
   if(!disposed&&generation===cameraGeneration)loopTimer=setTimeout(()=>cameraLoop(generation),Math.max(CAPTURE_POLICY.minimumLoopDelayMs,CAPTURE_POLICY.frameIntervalMs-(performance.now()-started)));
 }
 $('start-camera').addEventListener('click',async()=>{
-  if(pending()||stream)return;error();const generation=++cameraGeneration;state.camera={status:'starting',detail:'请允许浏览器使用摄像头。若一直等待，可检查系统权限或停止后用照片参与。'};render();
+  if(pending()||stream)return;error();
+  if(room.requested&&!room.ready){error('请先连接教室房间，再开启自动采集。');room.reveal();return;}
+  if(room.active&&!room.sharingConsent){error('请先勾选同意共享照片，再开启自动采集。');room.revealConsent();return;}
+  cameraRetry=null;autoCapture.arm();state.capture={status:'waiting',detail:'请正对镜头。模型准备好并检测到人脸后，会自动采集并加入一次。',progress:0};
+  const generation=++cameraGeneration;state.camera={status:'starting',detail:'请允许浏览器使用摄像头。若一直等待，可检查系统权限或停止后用照片参与。'};render();
   try{
     if(!navigator.mediaDevices?.getUserMedia)throw new Error('当前环境不支持摄像头，请使用 HTTPS 页面或照片参与。');
     const next=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:960}},audio:false});
     if(disposed||generation!==cameraGeneration){next.getTracks().forEach(track=>track.stop());return;}
     stream=next;video.srcObject=stream;await video.play();render();await ensureModel();
     if(disposed||generation!==cameraGeneration)return;
-    state.camera={status:'running'};state.live={status:'waiting',scores:{},detail:'正在寻找人脸'};
+    state.camera={status:'running'};state.live={status:'waiting',scores:{},detail:'请正对镜头，检测到清晰人脸后自动采集'};
     stream.getVideoTracks()[0].addEventListener('ended',()=>{if(generation===cameraGeneration)stopCamera('摄像头连接已结束。');});
     render();cameraLoop(generation);
   }catch(e){if(generation!==cameraGeneration||disposed)return;stopCamera();const detail=['NotAllowedError','PermissionDeniedError'].includes(e.name)?'未获得摄像头权限。可以用照片参与，或允许权限后重试。':e.message;state.camera={status:'error',detail};error(detail);render();}
 });
 $('stop-camera').addEventListener('click',()=>stopCamera());
-$('capture').addEventListener('click',()=>{
-  if(captureRun||state.camera.status!=='running'||state.live.status!=='ok')return;
-  const run=new CaptureWindow({startedAt:performance.now(),scoreKeys:EMOTION_KEYS});
-  captureRun=run;state.capture={status:'capturing',detail:`请保持一位观众正对镜头，采集 ${CAPTURE_DURATION_LABEL}。`,progress:0};render();
+function beginCapture({automatic=false}={}){
+  if(captureRun||submitting||state.camera.status!=='running'||state.live.status!=='ok')return;
+  if(room.requested&&(!room.ready||!room.sharingConsent)){error('请先连接房间并同意共享照片。');room.revealConsent();return;}
+  if(!automatic)autoCapture.cancel();
+  cameraRetry=null;
+  const generation=cameraGeneration,cohort=cohortId();
+  const run=new CaptureWindow({startedAt:performance.now(),scoreKeys:EMOTION_KEYS,maxDurationMs:6000});
+  captureRun=run;state.capture={status:'capturing',detail:`正在采集，请保持一位观众正对镜头，约 ${CAPTURE_DURATION_LABEL}。`,progress:0};render();
   const finishCapture=async()=>{
-    if(captureRun!==run||disposed)return;
+    if(captureRun!==run||disposed||generation!==cameraGeneration)return;
     const result=run.finish(performance.now());
-    if(result.status==='pending'){captureTimer=setTimeout(finishCapture,result.remainingMs);return;}
+    if(result.status==='pending'){
+      if(result.extended)state.capture.detail='还需要一点时间，请保持正对镜头，采集完成后会自动加入。';
+      captureTimer=setTimeout(finishCapture,result.remainingMs);return;
+    }
     captureRun=null;captureTimer=null;
     if(result.status!=='completed'){
-      const detail=result.reason==='missing-photo'
-        ? '有效表情已采到，但未能在采集时间内取得清晰照片。请保持稳定重试。'
-        : `有效画面 ${result.frameCount||0} 帧，至少需要 ${CAPTURE_POLICY.minFrames} 帧。请保持稳定重试。`;
-      state.capture={status:'rejected',progress:0,detail};render();return;
+      if(automatic&&autoCapture.reject())state.capture={status:'waiting',progress:0,detail:'刚才画面不够稳定。请保持正对镜头，我会自动再试一次。'};
+      else state.capture={status:'rejected',progress:0,detail:'暂时未能取得稳定画面。请调整光线并正对镜头，再点击“手动再采一次”。'};
+      render();return;
     }
-    await addContribution({scores:result.scores,blob:result.photo.blob,anchors:result.photo.anchors});
+    if(cohortId()!==cohort){autoCapture.cancel();state.capture={status:'idle',progress:0,detail:'房间或本轮已更新，请重新采集。'};render();return;}
+    const payload={scores:result.scores,blob:result.photo.blob,anchors:result.photo.anchors};
+    const added=await addContribution(payload);
+    if(disposed||generation!==cameraGeneration)return;
+    autoCapture.complete();
+    if(added)stopCamera();
+    else if(cohortId()===cohort){cameraRetry={payload,cohort};state.capture.detail+=' 可点击“重试加入作品”重新提交这次采集。';render();}
   };
   captureTimer=setTimeout(finishCapture,CAPTURE_POLICY.durationMs);
+}
+$('capture').addEventListener('click',async()=>{
+  if(cameraRetry){
+    if(submitting||cameraRetry.cohort!==cohortId())return;
+    if(await addContribution(cameraRetry.payload)){cameraRetry=null;stopCamera();}
+  }else beginCapture();
 });
-$('reset-session').addEventListener('click',async()=>{if(!currentSession().participants.length||submitting)return;if(confirm(room.active?'清空这个教室房间的所有照片与记录？所有参与设备都会同步清空。':'清空当前浏览器本轮照片与记录？')){cancelCapture();try{if(room.active)await room.reset();else session.reset();state.capture={status:'idle',detail:'本轮已清空，可以重新参与。',progress:0};render();}catch(e){error(e.message);}}});
+$('reset-session').addEventListener('click',async()=>{if(!currentSession().participants.length||submitting)return;if(confirm(room.active?'清空这个教室房间的所有照片与记录？所有参与设备都会同步清空。':'清空当前浏览器本轮照片与记录？')){autoCapture.cancel();cameraRetry=null;cancelCapture();try{if(room.active)await room.reset();else session.reset();state.capture={status:'idle',detail:'本轮已清空，可以重新参与。',progress:0};render();}catch(e){error(e.message);}}});
 function clearTest(){testedImage=null;$('add-image').disabled=true;if(testPreviewUrl)URL.revokeObjectURL(testPreviewUrl);testPreviewUrl=null;$('test-preview').removeAttribute('src');$('image-test-result').hidden=true;scoresToRows(imageRows,{});}
 $('test-file').addEventListener('change',()=>{clearTest();controls();});
 $('image-test-form').addEventListener('submit',async event=>{
@@ -162,9 +187,11 @@ $('image-test-form').addEventListener('submit',async event=>{
   finally{bitmap?.close();testingImage=false;controls();render();}
 });
 async function addContribution({blob,scores,anchors}){
- if(submitting)return false;submitting=true;error();const before=structuredClone(currentSession());render();
+ if(submitting)return false;submitting=true;error();const contributionCohort=cohortId(),before=structuredClone(currentSession());render();
  try{
+  if(room.requested&&!room.ready)throw new Error('尚未连接教室房间，请先点击“重新连接房间”。这次照片不会加入本机作品。');
   const participantId=room.active?await room.submit({blob,scores,anchors}):session.add({scores,photoUrl:URL.createObjectURL(blob),anchors});
+  if(disposed||cohortId()!==contributionCohort)throw new Error('房间或本轮已更新，请重新采集。');
   state.capture={status:'completed',progress:1,detail:room.active?'已同步到教室大屏，正在展示你的六片贡献。':'已加入作品，正在展示你的六片贡献。'};
   revealContribution();
   const after=structuredClone(currentSession());

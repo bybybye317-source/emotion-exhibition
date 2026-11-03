@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="./static/scent-atelier.css?v=20261028-flow">
   <link rel="stylesheet" href="./static/exhibition.css?v=20261028-gallery192">
   <script type="importmap">{"imports":{"three":"./static/vendor/three/three.module.js","three/addons/":"./static/vendor/three/addons/"}}</script>
-  <script type="module" src="./static/app.js?v=20261029-room"></script>
+  <script type="module" src="./static/app.js?v=20261103-auto"></script>
   <script type="module" src="./static/portrait.js?v=20261029-contribution"></script>
   <script type="module" src="./static/music.js?v=20261028-gallery192"></script>
   <script type="module" src="./static/scent.js?v=20261028-gallery192"></script>
@@ -268,17 +268,17 @@
           <div id="camera-placeholder" class="camera-placeholder">
             <svg class="icon camera-icon"><use href="#icon-camera"></use></svg>
             <h2 id="camera-placeholder-title">摄像头尚未开启</h2>
-            <p id="camera-placeholder-detail">开启摄像头后，正对镜头开始采集</p>
+            <p id="camera-placeholder-detail">开启摄像头后，正对镜头即可自动采集并加入</p>
           </div>
           <div id="preview-badge" class="preview-badge" hidden>等待有效人脸</div>
         </div>
         <div class="camera-actions">
-          <button id="start-camera" class="button primary" disabled><svg class="icon"><use href="#icon-camera"></use></svg><span>开启摄像头</span></button>
-          <button id="capture" class="button" disabled><svg class="icon"><use href="#icon-clock"></use></svg><span id="capture-label">采集 1.5 秒</span></button>
+          <button id="start-camera" class="button primary" disabled><svg class="icon"><use href="#icon-camera"></use></svg><span>开启摄像头并自动采集</span></button>
+          <button id="capture" class="button" disabled><svg class="icon"><use href="#icon-clock"></use></svg><span id="capture-label">手动再采一次</span></button>
           <button id="stop-camera" class="button subtle" disabled><svg class="icon"><use href="#icon-stop"></use></svg><span>停止摄像头</span></button>
         </div>
         <div class="camera-feedback">
-          <p id="capture-detail" role="status">开启摄像头后，采集一位观众的表情。</p>
+          <p id="capture-detail" role="status">开启摄像头后，检测到清晰人脸就会自动采集一次。</p>
           <div id="capture-progress" class="capture-progress" role="progressbar" aria-label="采集进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><span id="capture-progress-fill"></span></div>
         </div>
       </section>

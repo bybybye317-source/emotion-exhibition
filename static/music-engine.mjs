@@ -1,5 +1,5 @@
 import {MUSIC_BPM, BAR_SECONDS, MUSIC_LAYERS, musicParameters, sanitizeParameters, planBar, midiFrequency} from './music-math.mjs?v=20261027-emotions';
-import {loadOrchestraSamples, selectOrchestraSample} from './music-samples.mjs';
+import {loadOrchestraSamples, selectOrchestraSample} from './music-samples.mjs?v=20261103-network';
 import {createMusicAnalysis, createVisualFrame, clearVisualFrame} from './music-analysis.mjs?v=20261027-emotions';
 
 const MAX_VOICES = 64;

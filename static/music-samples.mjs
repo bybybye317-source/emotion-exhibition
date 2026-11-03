@@ -59,7 +59,7 @@ export function validateSampleManifest(manifest, manifestUrl = ORCHESTRA_MANIFES
   return {library: String(manifest.library || 'VSCO 2 CE'), license: String(manifest.license || ''), entries};
 }
 
-export async function loadOrchestraSamples(context, {manifestUrl = ORCHESTRA_MANIFEST_URL, fetcher = globalThis.fetch, timeoutMs = 15000, onProgress = () => {}} = {}) {
+export async function loadOrchestraSamples(context, {manifestUrl = ORCHESTRA_MANIFEST_URL, fetcher = globalThis.fetch, timeoutMs = 60000, onProgress = () => {}} = {}) {
   if (typeof fetcher !== 'function' || typeof context?.decodeAudioData !== 'function') throw new Error('浏览器不支持加载管弦采样。');
   const manifest = await cached(manifests, manifestUrl, async () => validateSampleManifest(await request(manifestUrl, fetcher, timeoutMs, 'json'), manifestUrl));
   let contextCache = decoded.get(context);

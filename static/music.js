@@ -1,4 +1,4 @@
-import { EmotionMusicEngine } from './music-engine.mjs?v=20261028-fast';
+import { EmotionMusicEngine } from './music-engine.mjs?v=20261103-network';
 import { musicParameters, groupDiversity } from './music-math.mjs?v=20261027-emotions';
 import { connectMusicVisual } from './music-visual-controller.mjs?v=20261027-breath';
 

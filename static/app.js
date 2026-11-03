@@ -1,4 +1,4 @@
-import {createRoomControls} from './room-controls.mjs?v=20261103-connection';
+import {createRoomControls} from './room-controls.mjs?v=20261103-reconnect';
 import {BrowserEmotionAnalyzer} from './browser-inference.mjs?v=20261028-anatomy';
 import {LocalSession, EMOTION_KEYS} from './session-state.mjs?v=20261028-gallery192';
 import {CAPTURE_POLICY, CAPTURE_DURATION_LABEL, CaptureWindow} from './capture-window.mjs?v=20261103-auto';
@@ -17,12 +17,13 @@ const frameContext=frame.getContext('2d',{willReadFrequently:true});
 let submitting=false,cameraRetry=null;
 const autoCapture=new AutoCaptureGate();
 let renderedCohort='local';
-const room=createRoomControls({onState:()=>{render();},onError:error,isBusy:()=>Boolean(captureRun)||testingImage||submitting||state.camera.status==='starting'});
-const currentSession=()=>room.snapshot?.session||session.snapshot();
+const room=createRoomControls({onState:()=>{render();},onError:message=>error(message,'room'),isBusy:()=>Boolean(captureRun)||testingImage||submitting||state.camera.status==='starting'});
+const emptyRoomSession={participants:[],participant_count:0,group_scores:{}};
+const currentSession=()=>room.snapshot?.session||(room.requested?emptyRoomSession:session.snapshot());
 const pending=()=>state.camera.status==='starting'||testingImage||submitting||room.busy;
 const cohortId=()=>room.active?`${room.roomId}:${room.snapshot?.generation??0}`:'local';
 const emit=()=>window.dispatchEvent(new CustomEvent('emotion:state',{detail:{state:structuredClone(state),connected:true,scope:room.active?'room':'local',cohortId:cohortId()}}));
-function error(message='') {$('action-error').hidden=!message;$('action-error').textContent=message;}
+function error(message='',source='app') {const banner=$('action-error');if(!message&&source==='room'&&banner.dataset.source!=='room')return;banner.dataset.source=source;banner.hidden=!message;banner.textContent=message;}
 function makeRows(id) {
   const root=$(id);root.replaceChildren();const rows={};
   for(const key of EMOTION_KEYS){const row=document.createElement('div');row.className='score-row';const label=document.createElement('span');label.className='score-label';label.textContent=labels[key];const track=document.createElement('div');track.className='score-track';const fill=document.createElement('div');fill.className='score-fill';track.append(fill);const value=document.createElement('span');value.className='score-number';value.textContent='—';row.append(label,track,value);root.append(row);rows[key]={row,fill,value};}return rows;

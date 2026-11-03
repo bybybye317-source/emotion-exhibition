@@ -47,7 +47,7 @@ for(const status of [403,200])test(`provider HTML ${status} preserves the curren
   await c.join(credentials);const snapshot=c.snapshot,photo=c._photos.get('a');blocked=true;
   await assert.rejects(c.refresh(),e=>e.status===status&&e.serviceResponse&&!e.invalidatesRoom);
   assert.equal(c.snapshot,snapshot);assert.equal(c._photos.get('a'),photo);assert.deepEqual(c.credentials,credentials);
-  assert.equal(statuses.at(-1).status,'offline');assert.match(statuses.at(-1).detail,/无法确认房间状态/);assert.match(statuses.at(-1).detail,/自动重试/);
+  assert.equal(statuses.at(-1).status,'offline');assert.match(statuses.at(-1).detail,/无法确认房间状态/);assert.match(statuses.at(-1).detail,/自动重连/);
   c.snapshot.expiresAt=Date.now()-1;
   await assert.rejects(c.refresh(),e=>e.invalidatesRoom);
   assert.equal(c.snapshot,null);assert.equal(c._photos.size,0);assert.equal(c.credentials,null);assert.equal(statuses.at(-1).status,'expired');
@@ -124,4 +124,84 @@ test('submission rechecks its room after snapshot listeners run during hydration
   await c.join(credentials);leaveAfterApply=true;await assert.rejects(c.submit(submission()),/房间操作已取消/);
   assert.equal(c.credentials,null);assert.equal(c.snapshot,null);
  }finally{c.leave(false);}
+});
+
+
+test('a transient first join keeps the invitation and automatically connects on the next poll',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});let calls=0;const statuses=[];
+ const c=new RoomClient({pollIntervalMs:1000,onStatus:s=>statuses.push(s),fetchImpl:async()=>{if(++calls===1)throw new TypeError('Failed to fetch');return response(empty);}});
+ try{
+  await assert.rejects(c.join(credentials),e=>e.retryable&&e.code==='NETWORK');
+  assert.deepEqual(c.credentials,credentials);assert.equal(c.role,'participant');assert.equal(c.snapshot,null);
+  assert.equal(statuses.at(-1).status,'offline');assert.match(statuses.at(-1).detail,/保留房间邀请/);
+  t.mock.timers.tick(1000);await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(calls,2);assert.equal(c.snapshot.session.participant_count,0);assert.equal(statuses.at(-1).status,'connected');
+ }finally{c.leave(false);t.mock.timers.reset();}
+});
+test('a canceled old join cannot clear a newer room even if the old fetch ignores abort',async()=>{
+ const first=deferred(),began=deferred();let calls=0;
+ const other={roomId:'s'.repeat(32),joinToken:'k'.repeat(32)};
+ const c=new RoomClient({fetchImpl:async()=>{if(++calls===1){began.resolve();return first.promise;}return response({...empty,roomId:other.roomId});}});
+ try{
+  const oldJoin=c.join(credentials),oldRejection=assert.rejects(oldJoin,/房间操作已取消/);await began.promise;
+  await c.join(other);await oldRejection;
+  first.resolve(response(empty));await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(c.credentials,other);assert.equal(c.snapshot.roomId,other.roomId);assert.equal(c.role,'participant');
+ }finally{c.leave(false);}
+});
+test('stalled JSON bodies time out and the retained invitation can reconnect',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});let stalled=true,signal;const bodyRead=deferred();
+ const c=new RoomClient({requestTimeoutMs:10,pollIntervalMs:1000,fetchImpl:async(_url,options)=>{
+  signal=options.signal;
+  if(!stalled)return response(empty);
+  return {ok:true,status:200,headers:new Headers({'Content-Type':'application/json'}),json:()=>{bodyRead.resolve();return new Promise(()=>{});}};
+ }});
+ try{
+  const failed=assert.rejects(c.join(credentials),e=>e.code==='TIMEOUT'&&e.retryable);await bodyRead.promise;
+  t.mock.timers.tick(10);await failed;assert.equal(signal.aborted,true);assert.deepEqual(c.credentials,credentials);
+  stalled=false;t.mock.timers.tick(1000);await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(c.snapshot.session.participant_count,0);
+ }finally{c.leave(false);t.mock.timers.reset();}
+});
+test('stalled photo bodies are bounded and cannot publish an incomplete snapshot',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const bodyRead=deferred();let photoSignal;
+ const c=new RoomClient({requestTimeoutMs:10,fetchImpl:async(url,options)=>url.endsWith('/a')?{
+  ok:true,status:200,headers:new Headers({'Content-Type':'image/jpeg'}),blob:()=>{photoSignal=options.signal;bodyRead.resolve();return new Promise(()=>{});}
+ }:response(withPhoto)});
+ try{
+  const failed=assert.rejects(c.join(credentials),e=>e.code==='TIMEOUT');await bodyRead.promise;
+  t.mock.timers.tick(10);await failed;
+  assert.equal(photoSignal.aborted,true);assert.equal(c.snapshot,null);assert.equal(c._photos.size,0);assert.deepEqual(c.credentials,credentials);
+  c.leave(false);t.mock.timers.tick(60000);assert.equal(c.credentials,null);
+ }finally{c.leave(false);t.mock.timers.reset();}
+});
+test('timeouts do not automatically retry room creation writes',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});let calls=0,signal;const started=deferred();
+ const c=new RoomClient({requestTimeoutMs:10,fetchImpl:(_url,options)=>{calls++;signal=options.signal;started.resolve();return new Promise(()=>{});}});
+ try{
+  const failed=assert.rejects(c.createRoom(),e=>e.code==='TIMEOUT');await started.promise;
+  t.mock.timers.tick(10);await failed;t.mock.timers.tick(120000);
+  assert.equal(calls,1);assert.equal(signal.aborted,true);assert.equal(c.credentials,null);assert.equal(c._timer,null);
+ }finally{c.leave(false);t.mock.timers.reset();}
+});
+test('joining works without AbortSignal.any and AbortSignal.timeout on older mobile browsers',async()=>{
+ const originalAny=Object.getOwnPropertyDescriptor(AbortSignal,'any'),originalTimeout=Object.getOwnPropertyDescriptor(AbortSignal,'timeout');
+ const c=new RoomClient({fetchImpl:async()=>response(empty)});
+ try{
+  Object.defineProperty(AbortSignal,'any',{configurable:true,value:undefined});Object.defineProperty(AbortSignal,'timeout',{configurable:true,value:undefined});
+  await c.join(credentials);assert.equal(c.snapshot.session.participant_count,0);
+ }finally{
+  c.leave(false);
+  if(originalAny)Object.defineProperty(AbortSignal,'any',originalAny);else delete AbortSignal.any;
+  if(originalTimeout)Object.defineProperty(AbortSignal,'timeout',originalTimeout);else delete AbortSignal.timeout;
+ }
+});
+test('leaving cancels a hanging request promptly and removes its deadline listener',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const started=deferred();let signal;const statuses=[];
+ const c=new RoomClient({onStatus:s=>statuses.push(s.status),fetchImpl:(_url,options)=>{signal=options.signal;started.resolve();return new Promise(()=>{});}});
+ try{
+  const stopped=assert.rejects(c.join(credentials),e=>e.code==='CANCELLED');await started.promise;c.leave();await stopped;
+  t.mock.timers.tick(60000);await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(signal.aborted,true);assert.equal(c.credentials,null);assert.equal(c._timer,null);assert.equal(statuses.at(-1),'left');
+ }finally{c.leave(false);t.mock.timers.reset();}
 });

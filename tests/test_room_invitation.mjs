@@ -7,7 +7,7 @@ const credentials = {roomId: 'r'.repeat(32), joinToken: 'j'.repeat(32)};
 const fragment = `?room=${credentials.roomId}&join=${credentials.joinToken}`;
 
 test('new QR entry loads the current HTML version and preserves the project subpath', () => {
-  const link = createRoomInvitation(`${base}?v=old&preview=anger#music-panel`, credentials);
+  const link = createRoomInvitation(`${base}?v=old&preview=anger&mode=host#music-panel`, credentials);
   const url = new URL(link);
   assert.equal(url.origin + url.pathname, base);
   assert.deepEqual([...url.searchParams], [['v', ROOM_ENTRY_VERSION]]);
@@ -80,4 +80,10 @@ test('creating an invitation rejects invalid URLs and credentials without mutati
   for (const location of [null, '', 'invalid', 'file:///tmp/index.html', 'https://u:p@example.com/']) {
     assert.equal(createRoomInvitation(location, original), null);
   }
+});
+
+test('phone invitations never inherit automatic desktop hosting', () => {
+  const url=new URL(createRoomInvitation(base+'?mode=host#gallery-panel',credentials));
+  assert.equal(url.searchParams.has('mode'),false);
+  assert.equal(url.hash.startsWith('#capture-panel?'),true);
 });

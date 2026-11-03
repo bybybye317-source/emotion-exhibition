@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import fs from 'node:fs';
 import {D1RoomStore} from './d1-store.mjs';
-import {handleRequest,ROOM_TTL_MS,snapshotFromRows,validateContribution} from './core.mjs';
+import {handleRequest,ROOM_TTL_MS,digest,validateContribution} from './core.mjs';
 function database(){const sqlite=new DatabaseSync(':memory:');sqlite.exec(fs.readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));return {
  prepare(sql){return {args:[],bind(...args){this.args=args;return this;},async run(){return this._run();},async first(){return sqlite.prepare(sql).get(...this.args)||null;},_run(){const stmt=sqlite.prepare(sql);return /^\s*(SELECT|WITH)/i.test(sql)?{results:stmt.all(...this.args)}:{results:[],meta:stmt.run(...this.args)};}};},
  async batch(statements){sqlite.exec('BEGIN IMMEDIATE');try{const r=statements.map(s=>s._run());sqlite.exec('COMMIT');return r;}catch(e){sqlite.exec('ROLLBACK');throw e;}}
@@ -60,6 +60,61 @@ test('duplicate retry increments only once; reset rejects late contributions',as
 test('room expiry removes stored photo and receipt',async()=>{
  const f=fixture(),r=await create(f),url=`/api/rooms/${r.roomId}`;await f.call(url+'/contributions','POST',r.joinToken,payload());
  f.advance(ROOM_TTL_MS+1);assert.equal((await f.call(url,'GET',r.joinToken)).status,404);assert.equal(await f.store.get(r.roomId),null);
+});
+test('new classroom expires at exactly five hours, including photo and write access',async()=>{
+ const f=fixture(),createdAt=f.now,r=await create(f),url=`/api/rooms/${r.roomId}`;
+ const fiveHours=18_000_000;
+ assert.equal(ROOM_TTL_MS,fiveHours);
+ assert.equal(r.expiresAt,createdAt+fiveHours);
+ assert.equal(r.snapshot.expiresAt,r.expiresAt);
+ assert.equal((await(await f.call('/api/health')).json()).roomTtlSeconds,18_000);
+ const contribution=await(await f.call(url+'/contributions','POST',r.joinToken,payload())).json();
+ const photoUrl=url+'/photos/'+contribution.recordId;
+ f.advance(4*60*60*1000+59*60*1000);
+ assert.equal((await f.call(url,'GET',r.joinToken)).status,200);
+ assert.equal((await f.call(photoUrl,'GET',r.joinToken)).status,200);
+ f.advance(59_999);
+ assert.equal((await f.call(url,'GET',r.joinToken)).status,200);
+ f.advance(1);
+ assert.equal(f.now,createdAt+fiveHours);
+ assert.equal((await f.call(photoUrl,'GET',r.joinToken)).status,404);
+ assert.equal((await f.call(url,'GET',r.joinToken)).status,404);
+ assert.equal((await f.call(url+'/contributions','POST',r.joinToken,payload())).status,404);
+ assert.equal((await f.call(url+'/reset','POST',r.hostToken)).status,404);
+ assert.equal(await f.store.get(r.roomId),null);
+ assert.equal(await f.store.photo(r.roomId,contribution.recordId),null);
+ assert.equal((await f.store.q('SELECT COUNT(*) AS count FROM receipts WHERE room_id=?',r.roomId).first()).count,0);
+});
+test('refreshing, polling and resetting do not extend the five-hour classroom deadline',async()=>{
+ const f=fixture(),createdAt=f.now,r=await create(f),url=`/api/rooms/${r.roomId}`;
+ await f.call(url+'/contributions','POST',r.joinToken,payload());
+ f.advance(60*60*1000);
+ const refresh=await(await f.call(url,'GET',r.joinToken)).json();
+ const unchanged=await(await f.call(url+'?since='+refresh.revision,'GET',r.joinToken)).json();
+ assert.equal(unchanged.unchanged,true);assert.equal(unchanged.expiresAt,r.expiresAt);
+ f.advance(60*60*1000);
+ const reset=await(await f.call(url+'/reset','POST',r.hostToken)).json();
+ assert.equal(reset.generation,1);assert.equal(reset.expiresAt,r.expiresAt);
+ const stored=await f.store.get(r.roomId);
+ assert.equal(stored.created_at,createdAt);assert.equal(stored.expires_at,createdAt+18_000_000);
+ f.advance(3*60*60*1000);
+ assert.equal((await f.call(url,'GET',r.joinToken)).status,404);
+});
+test('legacy two-hour classroom keeps its stored deadline while new classroom lasts five hours',async()=>{
+ const f=fixture(),createdAt=f.now,roomId='l'.repeat(32),joinToken='j'.repeat(32),hostToken='h'.repeat(32);
+ const legacyExpiry=createdAt+2*60*60*1000;
+ await f.store.create({id:roomId,join_hash:await digest(joinToken),host_hash:await digest(hostToken),created_at:createdAt,expires_at:legacyExpiry});
+ const newer=await create(f),url=`/api/rooms/${roomId}`;
+ f.advance(119*60*1000);
+ const oldSnapshot=await(await f.call(url,'GET',joinToken)).json();
+ assert.equal(oldSnapshot.expiresAt,legacyExpiry);
+ const reset=await(await f.call(url+'/reset','POST',hostToken)).json();
+ assert.equal(reset.expiresAt,legacyExpiry);
+ assert.equal((await f.store.get(roomId)).expires_at,legacyExpiry);
+ f.advance(60*1000);
+ assert.equal((await f.call(url,'GET',joinToken)).status,404);
+ assert.equal((await f.call(`/api/rooms/${newer.roomId}`,'GET',newer.joinToken)).status,200);
+ assert.equal((await f.store.get(newer.roomId)).expires_at,createdAt+18_000_000);
 });
 test('malformed, oversized and invalid score/anchor payloads are rejected',async()=>{
  const f=fixture(),r=await create(f),url=`/api/rooms/${r.roomId}/contributions`;

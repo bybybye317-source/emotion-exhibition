@@ -7,7 +7,7 @@ The GitHub Pages frontend uses `static/room-client.mjs` to contact the separatel
 - Room and host capabilities are independent random 192-bit tokens. Only SHA-256 digests are stored. The host token must never appear in an invitation link.
 - Invitations put the room ID and join capability in a URL fragment, which is not sent to GitHub Pages. A holder of this link can view the classroom's current participant photos. Do not publish classroom invitations publicly.
 - Every upload requires `consent:true`; the UI must explain that photo and score data are sent to the shared classroom.
-- Rooms expire two hours after creation. Expiry is enforced before data access. Expired rows are removed during subsequent API traffic; `worker.mjs` also exports scheduled cleanup for deployments with a cron trigger.
+- New rooms expire exactly five hours after creation. Existing rooms keep their stored expiry; refreshing, polling, and clearing a round never extend it. Expiry is enforced before data access. Expired rows are removed during subsequent API traffic; `worker.mjs` also exports scheduled cleanup for deployments with a cron trigger.
 - At most 32 photos remain in a room. New arrivals atomically evict older images. Host clear/end deletes photos and receipts. Client leave/expiry releases local object URLs.
 - There is no list-all-rooms or unauthenticated photo endpoint. Server code does not log photos or capability tokens.
 - Photo upload is compressed JPEG, maximum 240 KiB. Only finite bounded scores and normalized landmarks are retained. Client-side classifier outputs are not independently reclassified or identity-verified by the relay.

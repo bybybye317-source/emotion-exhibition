@@ -10,6 +10,9 @@ try{
  await db.batch(statements.map(s=>db.prepare(s)));
  const call=(path,method='GET',token,body)=>mf.dispatchFetch('http://local.test'+path,{method,headers:{Origin:'https://bybybye317-source.github.io',...(token?{Authorization:'Bearer '+token}:{}),...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined});
  const r=await(await call('/api/rooms','POST')).json();assert.ok(r.hostToken);
+ const lifetime=await db.prepare('SELECT created_at,expires_at FROM rooms WHERE id=?').bind(r.roomId).first();
+ assert.equal(lifetime.expires_at-lifetime.created_at,18_000_000);
+ assert.equal((await(await call('/api/health')).json()).roomTtlSeconds,18_000);
  const url='/api/rooms/'+r.roomId;
  const photo='data:image/jpeg;base64,'+btoa(String.fromCharCode(255,216,255,224,0,4,255,217));
  const body={requestId:crypto.randomUUID(),generation:0,consent:true,photoDataUrl:photo,anchors:{left_eye:[.3,.4],right_eye:[.7,.4],nose:[.5,.5],mouth:[.5,.7]},scores:{happiness:1,neutral:0,sadness:0,surprise:0,anger:0,fear:0,disgust:0,contempt:0}};
@@ -21,5 +24,5 @@ try{
  assert.equal((await call(url+'/photos/'+results[0].recordId,'GET',r.joinToken)).status,404);
  assert.equal((await call(url,'DELETE',r.hostToken)).status,200);
  assert.equal((await call(url,'GET',r.joinToken)).status,404);
- console.log('Miniflare D1 PASS: 6 concurrent submissions => 4 unique records; sequential unique slots, auth, reset, stale rejection and photo deletion.');
+ console.log('Miniflare D1 PASS: new rooms persist a five-hour expiry; 6 concurrent submissions => 4 unique records; sequential unique slots, auth, reset, stale rejection and photo deletion.');
 }finally{await mf.dispose();}

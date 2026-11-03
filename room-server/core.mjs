@@ -1,5 +1,6 @@
 export const EMOTIONS=['happiness','neutral','sadness','surprise','anger','fear','disgust','contempt'];
-export const ROOM_TTL_MS=2*60*60*1000;
+// New rooms receive five hours; existing rooms retain their stored expires_at.
+export const ROOM_TTL_MS=5*60*60*1000;
 export const MAX_PHOTO_BYTES=240*1024;
 export const MAX_BODY_BYTES=MAX_PHOTO_BYTES*4/3+18000;
 export class HttpError extends Error {constructor(status,message){super(message);this.status=status;}}

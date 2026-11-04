@@ -1,0 +1,50 @@
+name: empathy-classroom
+services:
+  relay:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    # Linux VPS only: both services share localhost. Node is never exposed on 8787.
+    network_mode: host
+    environment:
+      ROOM_HOST: 127.0.0.1
+      PORT: 8787
+      ROOM_DB_PATH: /data/classroom.sqlite
+      ROOM_ALLOWED_ORIGINS: ${ROOM_ALLOWED_ORIGINS:-https://bybybye317-source.github.io}
+    volumes:
+      - room_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:8787/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options: {max-size: 5m, max-file: '2'}
+  https:
+    image: caddy:2
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      ROOM_DOMAIN: ${ROOM_DOMAIN:?Set ROOM_DOMAIN to the real DNS hostname}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      relay:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options: {max-size: 5m, max-file: '2'}
+volumes:
+  room_data:
+  caddy_data:
+  caddy_config:

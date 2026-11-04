@@ -5,3 +5,10 @@ node_modules/
 .cache/
 __pycache__/
 .wrangler/
+
+# Classroom runtime databases must stay outside source archives.
+/data/
+/room-server/data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

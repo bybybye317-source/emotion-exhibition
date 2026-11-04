@@ -1,6 +1,6 @@
 # Classroom room relay
 
-The GitHub Pages frontend uses `static/room-client.mjs` to contact the separately deployed HTTPS relay. The relay uses Cloudflare D1; it does not rely on isolate memory for shared state. Canonical hosting source is `../empathy-classroom-service`, with these modules copied under `lib/room/` and Drizzle migrations generated from `db/schema.ts`.
+The GitHub Pages frontend uses `static/room-client.mjs` to contact the separately deployed HTTPS relay. The relay uses Cloudflare D1; it does not rely on isolate memory for shared state. The current Sites hosting source is `../empathy-classroom-service`, with these modules copied under `lib/room/` and Drizzle migrations generated from `db/schema.ts`.
 
 ## Privacy and lifetime
 
@@ -53,3 +53,12 @@ node room-server/test-miniflare.mjs
 ```
 
 The first suite executes the actual SQL through an in-memory SQLite-backed D1 adapter, including bounding, expiry, auth, reset, duplicates, and malformed input. The Miniflare test executes the Worker and D1 runtime with six concurrent HTTP submissions, including duplicate retries. Its `miniflare` dependency is taken from the sibling hosted service checkout, rather than adding a production dependency to the static website.
+
+
+## Independent Node / SQLite deployment
+
+`node-server.mjs` and `sqlite-store.mjs` run the same business rules on a standalone Node 24 server with a persistent SQLite database. The process listens on localhost by default and runs expiry cleanup once per minute; access checks still enforce the exact five-hour cutoff. The readiness endpoint checks the actual required tables and columns. It does not proxy the former Sites endpoint.
+
+Run locally with `node room-server/node-server.mjs`; configure `ROOM_DB_PATH`, `ROOM_HOST`, `PORT`, and `ROOM_ALLOWED_ORIGINS`. Run `node --test room-server/test-node-server.mjs` for real HTTP and persistence tests. Linux VPS HTTPS deployment files and status are in [deploy/README.md](deploy/README.md).
+
+As of 2026-11-04 this alternative is prepared and locally verified, but no Tencent instance, domain or public API has been selected or deployed. The public frontend API remains unchanged until the replacement passes live classroom verification. Host cache helpers isolate credentials by API origin during a future switch.

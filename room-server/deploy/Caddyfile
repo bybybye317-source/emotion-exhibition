@@ -1,0 +1,14 @@
+{$ROOM_DOMAIN} {
+    # Do not log classroom capability links, Authorization headers or photo data.
+    @room_api path /api/*
+    handle @room_api {
+        reverse_proxy 127.0.0.1:8787 {
+            header_up X-Real-IP {remote_host}
+            header_up -CF-Connecting-IP
+            header_up -X-Forwarded-For
+        }
+    }
+    handle {
+        respond "Empathy Gallery room service" 200
+    }
+}

@@ -1,6 +1,7 @@
 import {RoomClient, DEFAULT_ROOM_API} from './room-client.mjs?v=20261104-quick-qr';
 import {createRoomInvitation, parseRoomInvitation, ROOM_ENTRY_VERSION} from './room-invitation.mjs?v=20261104-quick-qr';
-import {roomLifetime, validHostSession, shouldAutoCreateHost} from './room-lifetime.mjs?v=20261104-quick-qr';
+import {roomLifetime, shouldAutoCreateHost} from './room-lifetime.mjs?v=20261104-quick-qr';
+import {readHostSession,writeHostSession,forgetHostSession} from './room-host-storage.mjs?v=20261104-relay';
 import qrcode from './vendor/qrcode-generator.mjs';
 export const ROOM_API=DEFAULT_ROOM_API;
 export function createRoomControls({onState=()=>{},onError=()=>{},isBusy=()=>false}={}){
@@ -17,9 +18,9 @@ export function createRoomControls({onState=()=>{},onError=()=>{},isBusy=()=>fal
  document.querySelector('main')?.prepend(root);
  const $=s=>root.querySelector(s);
  let busy=false,connectionTask=false,taskEpoch=0,pendingInvitation=null,ownId=null,connection=null,notice='',disposed=false,expiryRequested=false,creatingRoom=false,openingStarted=0,creationFailed=false;
- const storedKey='empathy-classroom-host-v1';
- const forgetHost=()=>{try{sessionStorage.removeItem(storedKey);}catch{}};
- const rememberHost=()=>{if(client.role==='host'&&client.roomInfo)try{sessionStorage.setItem(storedKey,JSON.stringify({...client.credentials,expiresAt:client.roomInfo.expiresAt}));}catch{}};
+ const legacyOrigin='https://empathy-gallery-classroom.bybybye317.chatgpt.site';
+ const forgetHost=()=>{try{forgetHostSession(sessionStorage,ROOM_API,{legacyOrigin});}catch{}};
+ const rememberHost=()=>{if(client.role==='host'&&client.roomInfo)try{writeHostSession(sessionStorage,ROOM_API,{...client.credentials,expiresAt:client.roomInfo.expiresAt});}catch{}};
  const status=$('.room-status'),detail=$('.room-detail'),consent=$('[data-consent]');
  const parse=text=>parseRoomInvitation(text,location.href);
  const invitation=credentials=>createRoomInvitation(location.href,credentials);
@@ -134,7 +135,7 @@ export function createRoomControls({onState=()=>{},onError=()=>{},isBusy=()=>fal
  // Incoming invitations always win over desktop mode or saved host credentials.
  const incoming=parse(location.href),hostMode=shouldAutoCreateHost(location.href);
  let saved=null;
- try{const value=JSON.parse(sessionStorage.getItem(storedKey)||'null');if(new URL(location.href).searchParams.get('mode')==='personal')saved=null;else if(validHostSession(value))saved=value;else if(value)forgetHost();}catch{forgetHost();}
+ try{if(new URL(location.href).searchParams.get('mode')!=='personal')saved=readHostSession(sessionStorage,ROOM_API,{legacyOrigin});}catch{}
  if(incoming){pendingInvitation=incoming;$('[data-link]').value=location.href;queueMicrotask(()=>task(()=>join(incoming),{connecting:true}));}
  else if(saved){
   pendingInvitation=saved;

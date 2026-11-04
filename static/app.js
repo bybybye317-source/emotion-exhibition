@@ -1,4 +1,4 @@
-import {createRoomControls} from './room-controls.mjs?v=20261103-lectern5h';
+import {room,attachRoomApp} from './room-session.mjs?v=20261104-quick-qr';
 import {BrowserEmotionAnalyzer} from './browser-inference.mjs?v=20261028-anatomy';
 import {LocalSession, EMOTION_KEYS} from './session-state.mjs?v=20261028-gallery192';
 import {CAPTURE_POLICY, CAPTURE_DURATION_LABEL, CaptureWindow} from './capture-window.mjs?v=20261103-auto';
@@ -17,7 +17,7 @@ const frameContext=frame.getContext('2d',{willReadFrequently:true});
 let submitting=false,cameraRetry=null;
 const autoCapture=new AutoCaptureGate();
 let renderedCohort='local';
-const room=createRoomControls({onState:()=>{render();},onError:message=>error(message,'room'),isBusy:()=>Boolean(captureRun)||testingImage||submitting||state.camera.status==='starting'});
+attachRoomApp({onState:()=>{render();},onError:message=>error(message,'room'),isBusy:()=>Boolean(captureRun)||testingImage||submitting||state.camera.status==='starting'});
 const emptyRoomSession={participants:[],participant_count:0,group_scores:{}};
 const currentSession=()=>room.snapshot?.session||(room.requested?emptyRoomSession:session.snapshot());
 const pending=()=>state.camera.status==='starting'||testingImage||submitting||room.busy;

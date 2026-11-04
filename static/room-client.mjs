@@ -20,10 +20,10 @@ export async function photoForRoom(blob){
  }finally{bitmap.close();}
 }
 export class RoomClient {
- constructor({baseUrl=DEFAULT_ROOM_API,onSnapshot=()=>{},onStatus=()=>{},pollIntervalMs=1500,requestTimeoutMs=30000,fetchImpl=globalThis.fetch.bind(globalThis)}={}){
+ constructor({baseUrl=DEFAULT_ROOM_API,onSnapshot=()=>{},onRoomInfo=()=>{},onStatus=()=>{},pollIntervalMs=1500,requestTimeoutMs=30000,fetchImpl=globalThis.fetch.bind(globalThis)}={}){
   const url=new URL(baseUrl);if(url.protocol!=='https:'&&!['localhost','127.0.0.1'].includes(url.hostname))throw new Error('房间服务需要 HTTPS');
-  this.baseUrl=url.origin;this.onSnapshot=onSnapshot;this.onStatus=onStatus;this.pollIntervalMs=Math.max(1000,pollIntervalMs);this.requestTimeoutMs=Number.isFinite(requestTimeoutMs)&&requestTimeoutMs>0?requestTimeoutMs:30000;this.fetchImpl=fetchImpl;
-  this.snapshot=null;this.role=null;this.credentials=null;this._epoch=0;this._timer=null;this._photos=new Map();this._pendingRefresh=null;this._pendingSubmit=null;this._applyTail=Promise.resolve();this._abort=new AbortController();this._failures=0;this._retryAllowed=true;
+  this.baseUrl=url.origin;this.onSnapshot=onSnapshot;this.onRoomInfo=onRoomInfo;this.onStatus=onStatus;this.pollIntervalMs=Math.max(1000,pollIntervalMs);this.requestTimeoutMs=Number.isFinite(requestTimeoutMs)&&requestTimeoutMs>0?requestTimeoutMs:30000;this.fetchImpl=fetchImpl;
+  this.snapshot=null;this.roomInfo=null;this.role=null;this.credentials=null;this._epoch=0;this._timer=null;this._photos=new Map();this._pendingRefresh=null;this._pendingSubmit=null;this._applyTail=Promise.resolve();this._abort=new AbortController();this._failures=0;this._retryAllowed=true;
  }
  _status(status,detail){this.onStatus({status,detail});}
  async _request(path,{method='GET',body,host=false,responseType='json'}={}){
@@ -88,7 +88,26 @@ export class RoomClient {
   }
  }
  async _apply(value,epoch){
+  this._publishRoomInfo(value,epoch);
   const run=this._applyTail.catch(()=>{}).then(()=>this._hydrate(value,epoch));this._applyTail=run;return run;
+ }
+ _publishRoomInfo(value,epoch){
+  if(epoch!==this._epoch||!this.credentials||!value||value.unchanged)return;
+  const count=value.session?.participant_count;
+  if(value.roomId!==this.credentials.roomId||!Number.isFinite(value.expiresAt)||!Number.isSafeInteger(value.revision)||value.revision<0||!Number.isSafeInteger(value.generation)||value.generation<0||!Number.isSafeInteger(count)||count<0||!Array.isArray(value.session?.participants)||count!==value.session.participants.length){
+   throw new RoomError('讲台信息不完整，暂时无法确认房间状态。',200,{serviceResponse:true,retryable:true});
+  }
+  if(this.roomInfo&&value.revision<this.roomInfo.revision)return;
+  // Metadata can reveal a verified invitation before photos finish downloading.
+  // It deliberately does not publish an incomplete artwork snapshot.
+  this.roomInfo=Object.freeze({roomId:value.roomId,expiresAt:value.expiresAt,participant_count:count,revision:value.revision,generation:value.generation});
+  this._checkExpiry();this.onRoomInfo(this.roomInfo);
+ }
+ _checkExpiry(){
+  const deadlines=[this.snapshot?.expiresAt,this.roomInfo?.expiresAt].filter(Number.isFinite);
+  if(deadlines.some(expiry=>expiry<=Date.now())){
+   this.leave(false);this.onSnapshot(null);this._status('expired','房间已过期，房间照片已从本机移除');throw new RoomError('房间已过期',404,{invalidatesRoom:true});
+  }
  }
  async _hydrate(value,epoch){
   if(epoch!==this._epoch||!value||value.unchanged)return;
@@ -103,6 +122,7 @@ export class RoomClient {
    const outcomes=await Promise.allSettled(Array.from({length:Math.min(4,rows.length)},loader));
    const failure=outcomes.find(r=>r.status==='rejected');if(failure)throw failure.reason;
    if(epoch!==this._epoch||this.snapshot&&value.revision<this.snapshot.revision){added.forEach(u=>URL.revokeObjectURL(u));return;}
+   this._checkExpiry();
    const previous=this._photos;this._photos=next;
    this.snapshot={...value,session:{...value.session,participants:rows.map(r=>({...r,image_url:next.get(r.id)}))}};
    this.onSnapshot(this.snapshot);
@@ -112,9 +132,7 @@ export class RoomClient {
  async refresh(){
   if(!this.credentials)return null;
   // Enforce expiry on this device even when the service is temporarily unreachable.
-  if(Number.isFinite(this.snapshot?.expiresAt)&&this.snapshot.expiresAt<=Date.now()){
-   this.leave(false);this.onSnapshot(null);this._status('expired','房间已过期，房间照片已从本机移除');throw new RoomError('房间已过期',404,{invalidatesRoom:true});
-  }
+  this._checkExpiry();
   if(this._pendingRefresh)return this._pendingRefresh;
   const epoch=this._epoch,room=this.credentials.roomId;
   const run=(async()=>{
@@ -147,5 +165,5 @@ export class RoomClient {
  }
  async reset(){if(this.role!=='host')throw new Error('只有教室大屏可以清空本轮');const epoch=this._epoch;const value=await this._request(`/api/rooms/${this.credentials.roomId}/reset`,{method:'POST',host:true});this._pendingSubmit=null;await this._apply(value,epoch);return this.snapshot;}
  async close(){if(this.role!=='host')throw new Error('只有教室大屏可以结束房间');await this._request(`/api/rooms/${this.credentials.roomId}`,{method:'DELETE',host:true});this.leave();}
- leave(notify=true){++this._epoch;clearTimeout(this._timer);this._timer=null;this._abort.abort();this._abort=new AbortController();this._pendingRefresh=null;this._pendingSubmit=null;this._failures=0;this._retryAllowed=true;for(const url of this._photos.values())URL.revokeObjectURL(url);this._photos.clear();this.snapshot=null;this.credentials=null;this.role=null;if(notify)this._status('left','已离开教室房间');}
+ leave(notify=true){++this._epoch;clearTimeout(this._timer);this._timer=null;this._abort.abort();this._abort=new AbortController();this._pendingRefresh=null;this._pendingSubmit=null;this._failures=0;this._retryAllowed=true;for(const url of this._photos.values())URL.revokeObjectURL(url);this._photos.clear();this.snapshot=null;this.credentials=null;this.role=null;const hadInfo=this.roomInfo!==null;this.roomInfo=null;if(hadInfo)this.onRoomInfo(null);if(notify)this._status('left','已离开教室房间');}
 }

@@ -25,12 +25,42 @@ test('saved host roles require all credentials and an unexpired known deadline',
  for(const expiresAt of [now,now-1,null,NaN,Infinity,'later'])assert.equal(validHostSession({...saved,expiresAt},now),false);
  for(const candidate of [null,{}, {...saved,roomId:'short'}, {...saved,hostToken:undefined}])assert.equal(validHostSession(candidate,now),false);
 });
-test('only the explicit desktop host entry starts a new lecture',()=>{
+test('ordinary gallery links start a shared lecture including old versioned bookmarks',()=>{
  const base='https://example.test/emotion-exhibition/';
- assert.equal(shouldAutoCreateHost(base),false);
- assert.equal(shouldAutoCreateHost(base+'?mode=host#gallery-panel'),true);
- assert.equal(shouldAutoCreateHost(base+'?mode=host',{hasInvitation:true}),false);
- assert.equal(shouldAutoCreateHost(base+'?mode=host',{hasSavedHost:true}),false);
- assert.equal(shouldAutoCreateHost(base+'?mode=host#capture-panel?room=invalid&join=invalid'),false);
- assert.equal(shouldAutoCreateHost('invalid'),false);
+ for(const suffix of ['', '#', '#gallery-panel', '?v=20261029-contribution#gallery-panel', '?v=20261103-lectern5h']){
+  assert.equal(shouldAutoCreateHost(base+suffix),true,suffix);
+ }
+});
+test('camera-only and individual artwork entries do not silently create rooms',()=>{
+ const base='https://example.test/emotion-exhibition/';
+ for(const view of ['capture','portrait','music','scent']){
+  assert.equal(shouldAutoCreateHost(base+`#${view}-panel`),false,view);
+  assert.equal(shouldAutoCreateHost(base+`?mode=host#${view}-panel`),true,view);
+ }
+});
+test('personal mode remains an explicit opt-out after leaving and refreshing',()=>{
+ const base='https://example.test/emotion-exhibition/';
+ for(const suffix of ['?mode=personal','?mode=personal#gallery-panel','?v=old&mode=personal#gallery-panel','?mode=host&mode=personal#gallery-panel']){
+  assert.equal(shouldAutoCreateHost(base+suffix),false,suffix);
+ }
+});
+test('incoming or saved rooms always prevent creating a second room',()=>{
+ for(const url of ['https://example.test/','https://example.test/?mode=host#gallery-panel']){
+  assert.equal(shouldAutoCreateHost(url,{hasInvitation:true}),false);
+  assert.equal(shouldAutoCreateHost(url,{hasSavedHost:true}),false);
+ }
+});
+test('valid and malformed invitation fields never become host entries',()=>{
+ const base='https://example.test/';
+ for(const query of [`room=${saved.roomId}&join=${saved.joinToken}`, 'room=invalid&join=invalid', 'room=', 'join=', 'room=a&room=b']){
+  for(const prefix of ['', '?mode=host']){
+   assert.equal(shouldAutoCreateHost(base+prefix+'#gallery-panel?'+query),false,query);
+  }
+  assert.equal(shouldAutoCreateHost(base+'?mode=host&'+query+'#gallery-panel'),false,query);
+ }
+});
+test('invalid URLs and unrecognized or ambiguous modes do not create rooms',()=>{
+ for(const url of ['invalid','javascript:alert(1)','file:///tmp/gallery.html','https://example.test/?mode=unknown','https://example.test/?mode=host&mode=host']){
+  assert.equal(shouldAutoCreateHost(url),false,url);
+ }
 });

@@ -13,11 +13,19 @@ export function validHostSession(saved,now=Date.now()){
   &&(!Object.prototype.hasOwnProperty.call(saved,'expiresAt')||(Number.isFinite(saved.expiresAt)&&saved.expiresAt>now));
 }
 
-// Explicit desktop entry alone can create a room; an invitation always wins.
+// Opening the gallery is the shared-screen entry. Camera-only and personal
+// entries stay local; any invitation fields suppress creating another room.
 export function shouldAutoCreateHost(url,{hasInvitation=false,hasSavedHost=false}={}){
  if(hasInvitation||hasSavedHost)return false;
  try{
-  const target=new URL(url),fragment=new URLSearchParams(target.hash.split('?')[1]||'');
-  return target.searchParams.get('mode')==='host'&&!fragment.has('room')&&!fragment.has('join');
+  const target=new URL(url),question=target.hash.indexOf('?');
+  const fragment=new URLSearchParams(question<0?'':target.hash.slice(question+1));
+  if(!['http:','https:'].includes(target.protocol))return false;
+  if(['room','join'].some(key=>fragment.has(key)||target.searchParams.has(key)))return false;
+  const modes=target.searchParams.getAll('mode');
+  if(modes.length>1||modes.length===1&&!['host',''].includes(modes[0]))return false;
+  if(modes[0]==='host')return true;
+  const view=(question<0?target.hash:target.hash.slice(0,question)).replace(/^#/,'');
+  return view===''||view==='gallery-panel';
  }catch{return false;}
 }

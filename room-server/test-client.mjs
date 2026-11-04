@@ -205,3 +205,66 @@ test('leaving cancels a hanging request promptly and removes its deadline listen
   assert.equal(signal.aborted,true);assert.equal(c.credentials,null);assert.equal(c._timer,null);assert.equal(statuses.at(-1),'left');
  }finally{c.leave(false);t.mock.timers.reset();}
 });
+
+test('verified room info is available before slow photos without making the artwork ready',async()=>{
+ const image=deferred(),started=deferred(),updates=[];
+ const c=new RoomClient({onRoomInfo:info=>updates.push(info),fetchImpl:async url=>{
+  if(url.endsWith('/a')){started.resolve();return image.promise;}return response(withPhoto);
+ }});
+ try{
+  const joining=c.join(credentials);await started.promise;
+  assert.deepEqual(c.roomInfo,{roomId:credentials.roomId,expiresAt:withPhoto.expiresAt,participant_count:1,revision:1,generation:0});
+  assert.equal(updates.length,1);assert.equal(c.snapshot,null);assert.equal(c._photos.size,0);
+  await assert.rejects(c.submit({consent:true}),/请先连接教室房间/);
+  image.resolve(new Response(new Blob(['image'],{type:'image/jpeg'})));await joining;
+  assert.equal(c.snapshot.session.participant_count,1);assert.equal(c._photos.size,1);
+  c.leave(false);assert.equal(c.roomInfo,null);assert.equal(updates.at(-1),null);
+ }finally{c.leave(false);}
+});
+test('metadata-only rooms expire locally even while their photo response is pending',async t=>{
+ t.mock.timers.enable({apis:['Date'],now:empty.expiresAt-1000});
+ const image=deferred(),started=deferred(),updates=[];
+ const c=new RoomClient({onRoomInfo:info=>updates.push(info),fetchImpl:async url=>{
+  if(url.endsWith('/a')){started.resolve();return image.promise;}return response(withPhoto);
+ }});
+ try{
+  const joining=c.join(credentials),rejected=assert.rejects(joining,e=>e.code==='CANCELLED');await started.promise;
+  assert.ok(c.roomInfo);assert.equal(c.snapshot,null);
+  t.mock.timers.tick(1000);await assert.rejects(c.refresh(),e=>e.invalidatesRoom);await rejected;
+  image.resolve(new Response(new Blob(['image'],{type:'image/jpeg'})));await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(c.roomInfo,null);assert.equal(updates.at(-1),null);assert.equal(c.snapshot,null);assert.equal(c.credentials,null);
+ }finally{c.leave(false);t.mock.timers.reset();}
+});
+test('room-auth invalidation removes early metadata and late responses cannot restore it',async()=>{
+ const image=deferred(),started=deferred(),updates=[];
+ const c=new RoomClient({onRoomInfo:info=>updates.push(info),fetchImpl:async url=>{
+  if(url.endsWith('/a')){started.resolve();return image.promise;}return response(withPhoto);
+ }});
+ try{
+  const joining=c.join(credentials),rejected=assert.rejects(joining,e=>e.invalidatesRoom);await started.promise;
+  assert.ok(c.roomInfo);image.resolve(response({error:'房间已结束或过期'},404));await rejected;
+  assert.equal(c.roomInfo,null);assert.equal(updates.at(-1),null);assert.equal(c.snapshot,null);assert.equal(c.credentials,null);
+  await c._apply(withPhoto,c._epoch-1);assert.equal(c.roomInfo,null);assert.equal(updates.length,2);
+ }finally{c.leave(false);}
+});
+test('metadata listeners can cancel hydration before any photos are requested',async()=>{
+ let loads=0,c;
+ c=new RoomClient({onRoomInfo:info=>{if(info)c.leave(false);},fetchImpl:async url=>{if(url.endsWith('/a'))loads++;return response(withPhoto);}});
+ try{
+  await assert.rejects(c.join(credentials),/房间操作已取消/);
+  assert.equal(loads,0);assert.equal(c.roomInfo,null);assert.equal(c.snapshot,null);assert.equal(c.credentials,null);
+ }finally{c.leave(false);}
+});
+test('mismatched or incomplete server metadata is not exposed as a live invitation',async()=>{
+ for(const invalid of [{...empty,roomId:'x'.repeat(32)},{...empty,expiresAt:undefined},{...empty,session:{...empty.session,participant_count:1}}]){
+  const updates=[],c=new RoomClient({onRoomInfo:info=>updates.push(info),fetchImpl:async()=>response(invalid)});
+  try{await assert.rejects(c.join(credentials),e=>e.serviceResponse);assert.equal(c.roomInfo,null);assert.equal(c.snapshot,null);assert.equal(updates.length,0);}finally{c.leave(false);}
+ }
+});
+test('new rooms publish their info after host credentials are assigned',async()=>{
+ const host={...credentials,hostToken:'h'.repeat(32)},updates=[];let c;
+ c=new RoomClient({onRoomInfo:info=>{if(info)updates.push({info,credentials:c.credentials,role:c.role});},fetchImpl:async()=>response({...host,expiresAt:empty.expiresAt,snapshot:empty},201)});
+ try{
+  await c.createRoom();assert.equal(updates.length,1);assert.deepEqual(updates[0].credentials,host);assert.equal(updates[0].role,'host');assert.equal(updates[0].info.expiresAt,empty.expiresAt);
+ }finally{c.leave(false);}
+});

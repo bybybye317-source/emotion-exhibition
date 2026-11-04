@@ -1,6 +1,6 @@
 // Keep participant credentials in the fragment: GitHub Pages does not need them.
 // The entry version reloads current HTML while old room QR codes remain valid.
-export const ROOM_ENTRY_VERSION = '20261103-lectern5h';
+export const ROOM_ENTRY_VERSION = '20261104-quick-qr';
 
 const validToken = value => typeof value === 'string' && /^[-_A-Za-z0-9]{32}$/.test(value);
 

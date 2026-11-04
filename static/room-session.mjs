@@ -1,5 +1,5 @@
 // Start the room connection independently of camera, model and artwork modules.
-import {createRoomControls} from './room-controls.mjs?v=20261104-tencent';
+import {createRoomControls} from './room-controls.mjs?v=20261104-mobile-model';
 let hooks={},lastError='';
 function showError(message){
  lastError=message;

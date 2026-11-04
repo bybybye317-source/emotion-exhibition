@@ -1,6 +1,7 @@
 // Browser-only adaptation of the archived Python pipeline. No input image is
 // sent to a server. The classifier is fetched from its original pinned source;
 // model weights are not redistributed in this website repository.
+import {fetchBytesWithProgress, inferenceAssetSources, FACE_MODEL, RUNTIME_ASSETS} from './inference-assets.mjs?v=20261104-mobile-model';
 export const CLASS_ORDER = ['anger', 'contempt', 'disgust', 'fear', 'happiness', 'neutral', 'sadness', 'surprise'];
 export const MODEL_SOURCE = Object.freeze({
   name: 'enet_b0_8_best_afew',
@@ -10,8 +11,67 @@ export const MODEL_SOURCE = Object.freeze({
 });
 const MEAN = [.485, .456, .406], STD = [.229, .224, .225];
 const local = path => new URL(path, import.meta.url).href;
-const createCanvas = (width, height) => typeof OffscreenCanvas === 'function'
-  ? new OffscreenCanvas(width, height) : Object.assign(document.createElement('canvas'), {width, height});
+const createCanvas = (width, height) => typeof document !== 'undefined'
+  ? Object.assign(document.createElement('canvas'), {width, height}) : new OffscreenCanvas(width, height);
+
+export function inferenceWorkerSupported(scope = globalThis) {
+  if (typeof scope.Worker !== 'function' || typeof scope.OffscreenCanvas !== 'function' || typeof scope.createImageBitmap !== 'function') return false;
+  // Mirror the bundled MediaPipe version's canvas gate. Safari 16 has a 2D
+  // OffscreenCanvas, but that is insufficient for its worker graphics path.
+  const ua = scope.navigator?.userAgent || '';
+  if (ua.includes('Safari') && !ua.includes('Chrome')) {
+    const version = ua.match(/Version\/(\d+).*Safari/);
+    if (!version || Number(version[1]) < 17) return false;
+  }
+  return true;
+}
+
+export function assertWorkerGraphics(scope = globalThis) {
+  let context;
+  try {
+    const canvas = new scope.OffscreenCanvas(1, 1);
+    context = canvas.getContext('webgl2') || canvas.getContext('webgl');
+  } catch {}
+  if (!context) {
+    const error = new Error('当前浏览器的后台图形能力不可用');
+    error.code = 'INFERENCE_WORKER_CAPABILITY';
+    throw error;
+  }
+  context.getExtension?.('WEBGL_lose_context')?.loseContext();
+}
+
+const abortError = () => Object.assign(new Error('识别加载已取消，可重新开启摄像头'), {name: 'AbortError'});
+export function initializationDeadline(operation, {label = '识别组件', signal, timeoutMs = 30000, disposeLate = () => {}} = {}) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (callback, value) => {
+      if (settled) return false;
+      settled = true; clearTimeout(timer); signal?.removeEventListener('abort', cancelled); callback(value); return true;
+    };
+    const cancelled = () => finish(reject, abortError());
+    const timer = setTimeout(() => finish(reject, Object.assign(new Error(`${label}初始化超时，请重试加载`), {code: 'INFERENCE_RUNTIME'})), timeoutMs);
+    signal?.addEventListener('abort', cancelled, {once: true});
+    if (signal?.aborted) cancelled();
+    Promise.resolve(operation).then(value => {
+      if (!finish(resolve, value)) Promise.resolve().then(() => disposeLate(value)).catch(() => {});
+    }, error => finish(reject, error));
+  });
+}
+
+export function inferenceProgressText(item) {
+  const mb = value => (value / 1048576).toFixed(1);
+  if (item.phase === 'retry') return `${item.label}连接较慢，正在重试下载…`;
+  if (item.phase === 'verify') return `正在校验${item.label}…`;
+  const total = item.total > 0 ? ` / ${mb(item.total)} MB` : ' MB';
+  return `${item.label} ${mb(item.loaded)}${total}${Number.isFinite(item.percent) ? ` · ${Math.floor(item.percent)}%` : ''}`;
+}
+
+async function downloadAsset(path, label, progress, signal, metadata = RUNTIME_ASSETS[path], fallback) {
+  return fetchBytesWithProgress(inferenceAssetSources(path, {fallback}), {
+    label, expectedBytes: metadata?.bytes, sha256: metadata?.sha256, signal,
+    onProgress: item => progress(inferenceProgressText(item)),
+  });
+}
 
 export function preprocessRgba(rgba, width = 224, height = 224) {
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || rgba.length !== width * height * 4) throw new Error('无效图像数据');
@@ -70,23 +130,15 @@ export function sharpnessVariance(rgba, width, height) {
   return count ? Math.max(0, squares / count - (total / count) ** 2) : 0;
 }
 
-async function fetchClassifier(onProgress) {
-  onProgress('正在下载表情模型（约 16 MB，来自作者原始仓库）…');
-  const response = await fetch(MODEL_SOURCE.url, {signal: AbortSignal.timeout(120000), credentials: 'omit'});
-  if (!response.ok) throw new Error(`表情模型下载失败（${response.status}），请稍后重试`);
-  const bytes = await response.arrayBuffer();
-  if (bytes.byteLength !== MODEL_SOURCE.bytes) throw new Error('表情模型大小不符，请重新加载');
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
-  const checksum = Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, '0')).join('');
-  if (checksum !== MODEL_SOURCE.sha256) throw new Error('表情模型校验失败，请重新加载');
-  return bytes;
+async function fetchClassifier(onProgress, signal) {
+  return downloadAsset('classifier.onnx', '下载表情模型', onProgress, signal, MODEL_SOURCE, MODEL_SOURCE.url);
 }
 
 // Kept exported for the dedicated worker. The UI uses BrowserEmotionAnalyzer.
 export class BrowserInferenceCore {
   constructor() {
     this.ready = false; this.disposed = false; this._initializing = null; this._busy = false;
-    this._landmarker = null; this._session = null; this._ort = null;
+    this._landmarker = null; this._session = null; this._ort = null; this._controller = null;
     this._frame = createCanvas(1, 1); this._detection = createCanvas(1, 1);
     this._crop = createCanvas(224, 224); this._quality = createCanvas(128, 128);
   }
@@ -95,40 +147,68 @@ export class BrowserInferenceCore {
     if (this.disposed) throw new Error('识别模块已关闭，请刷新页面');
     if (this.ready) return;
     if (this._initializing) return this._initializing;
-    const progress = message => { try { onProgress(message); } catch {} };
+    const controller = new AbortController(); this._controller = controller;
+    const {signal} = controller;
+    let lastProgress = '', lastProgressAt = -Infinity;
+    const progress = message => {
+      if (signal.aborted || this.disposed || message === lastProgress) return;
+      const now = performance.now();
+      if (message.includes(' MB') && !message.endsWith('100%') && now - lastProgressAt < 150) return;
+      lastProgress = message; lastProgressAt = now;
+      try { onProgress(message); } catch {}
+    };
     this._initializing = (async () => {
       let landmarker = null, session = null;
+      const urls = [];
+      const blobUrl = (bytes, type) => { const url = URL.createObjectURL(new Blob([bytes], {type})); urls.push(url); return url; };
       try {
         progress('正在载入浏览器本地识别组件…');
-        const [ort, vision] = await Promise.all([
+        const [ort, vision] = await initializationDeadline(Promise.all([
           import('./vendor/ort/ort.wasm.min.mjs'), import('./vendor/mediapipe/vision_bundle.mjs'),
-        ]);
+        ]), {label: '识别组件', signal});
         // Pages cannot set cross-origin isolation headers. One WASM thread
         // deliberately avoids SharedArrayBuffer and COOP/COEP requirements.
         ort.env.wasm.numThreads = 1;
         ort.env.wasm.proxy = false;
-        ort.env.wasm.wasmPaths = local('./vendor/ort/');
-        progress('正在准备人脸定位模型…');
-        const fileset = await vision.FilesetResolver.forVisionTasks(local('./vendor/mediapipe/wasm'));
-        landmarker = await vision.FaceLandmarker.createFromOptions(fileset, {
-          baseOptions: {modelAssetPath: local('./inference-models/face_landmarker.task'), delegate: 'CPU'},
+        const fileset = await initializationDeadline(vision.FilesetResolver.forVisionTasks(local('./vendor/mediapipe/wasm')), {label: '人脸运行环境', signal});
+        const loaderPath = `mediapipe/wasm/${new URL(fileset.wasmLoaderPath).pathname.split('/').pop()}`;
+        const wasmPath = `mediapipe/wasm/${new URL(fileset.wasmBinaryPath).pathname.split('/').pop()}`;
+        const faceBytes = await downloadAsset('face_landmarker.task', '下载人脸定位模型', progress, signal, FACE_MODEL);
+        const faceLoader = await downloadAsset(loaderPath, '下载人脸运行组件', progress, signal);
+        const faceWasm = await downloadAsset(wasmPath, '下载人脸运行引擎', progress, signal);
+        const localFileset = {wasmLoaderPath: blobUrl(faceLoader, 'text/javascript'), wasmBinaryPath: blobUrl(faceWasm, 'application/wasm')};
+        progress('下载完成 · 正在启动人脸定位（通常数秒）…');
+        landmarker = await initializationDeadline(vision.FaceLandmarker.createFromOptions(localFileset, {
+          canvas: createCanvas(1, 1),
+          baseOptions: {modelAssetBuffer: new Uint8Array(faceBytes), delegate: 'CPU'},
           runningMode: 'IMAGE', numFaces: 2,
           minFaceDetectionConfidence: .5, minFacePresenceConfidence: .5,
           outputFaceBlendshapes: false, outputFacialTransformationMatrixes: false,
-        });
-        const bytes = await fetchClassifier(progress);
+        }), {label: '人脸定位', signal, disposeLate: value => value?.close()});
+        const bytes = await fetchClassifier(progress, signal);
+        const ortLoader = await downloadAsset('ort/ort-wasm-simd-threaded.mjs', '下载表情运行组件', progress, signal);
+        const ortWasm = await downloadAsset('ort/ort-wasm-simd-threaded.wasm', '下载表情运行引擎', progress, signal);
+        // Both URLs refer to already verified bytes. ORT's loader still
+        // resolves a wasm filename even with wasmBinary, so give it an
+        // explicit blob path instead of a relative URL against blob:.
+        ort.env.wasm.wasmPaths = {mjs: blobUrl(ortLoader, 'text/javascript'), wasm: blobUrl(ortWasm, 'application/wasm')};
         if (this.disposed) throw new Error('识别模块已关闭');
         progress('正在初始化表情模型，第一次可能需要几秒…');
-        session = await ort.InferenceSession.create(bytes, {executionProviders: ['wasm'], graphOptimizationLevel: 'all'});
+        session = await initializationDeadline(ort.InferenceSession.create(bytes, {executionProviders: ['wasm'], graphOptimizationLevel: 'all'}),
+          {label: '表情模型', signal, disposeLate: value => value?.release()});
         if (this.disposed) throw new Error('识别模块已关闭');
         this._ort = ort; this._landmarker = landmarker; this._session = session; this.ready = true;
         progress('模型就绪 · 图像只在当前浏览器内处理');
       } catch (error) {
-        landmarker?.close();
+        controller.abort();
+        try { landmarker?.close(); } catch {}
         if (session) await session.release();
+        if (!error.assetDownload && error.name !== 'AbortError') error.inferenceRuntime = true;
         throw error;
+      } finally {
+        urls.forEach(url => URL.revokeObjectURL(url));
       }
-    })().finally(() => { this._initializing = null; });
+    })().finally(() => { this._initializing = null; if (this._controller === controller) this._controller = null; });
     return this._initializing;
   }
 
@@ -204,6 +284,7 @@ export class BrowserInferenceCore {
 
   async dispose() {
     this.disposed = true; this.ready = false;
+    this._controller?.abort();
     await this._analysisDone;
     this._landmarker?.close(); this._landmarker = null;
     if (this._session) await this._session.release();
@@ -212,21 +293,27 @@ export class BrowserInferenceCore {
 }
 
 export class BrowserEmotionAnalyzer {
-  constructor() {
+  constructor({coreFactory = () => new BrowserInferenceCore(), workerFactory = url => new Worker(url), workerSupported = inferenceWorkerSupported,
+    initIdleTimeoutMs = 45000, analysisTimeoutMs = 30000} = {}) {
     this.ready = false; this.disposed = false; this._initializing = null;
     this._worker = null; this._core = null; this._pending = new Map(); this._sequence = 0;
+    this._coreFactory = coreFactory; this._workerFactory = workerFactory; this._workerSupported = workerSupported;
+    this._initIdleTimeoutMs = initIdleTimeoutMs; this._analysisTimeoutMs = analysisTimeoutMs;
   }
 
   _request(type, data = {}, transfer = [], progress = () => {}) {
     const id = ++this._sequence;
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
+      const expired = () => {
         this._pending.delete(id);
-        reject(new Error('识别处理超时，请刷新后重试'));
-      }, type === 'init' ? 180000 : 30000);
-      this._pending.set(id, {resolve, reject, timer, progress});
+        reject(Object.assign(new Error('识别加载没有响应，请重试加载'), {code: 'INFERENCE_WORKER_TIMEOUT'}));
+      };
+      const request = {resolve, reject, timer: null, progress};
+      request.keepAlive = () => { clearTimeout(request.timer); request.timer = setTimeout(expired, type === 'init' ? this._initIdleTimeoutMs : this._analysisTimeoutMs); };
+      request.keepAlive();
+      this._pending.set(id, request);
       try { this._worker.postMessage({id, type, ...data}, transfer); }
-      catch (error) { clearTimeout(timer); this._pending.delete(id); reject(error); }
+      catch (error) { clearTimeout(request.timer); this._pending.delete(id); reject(error); }
     });
   }
 
@@ -235,27 +322,44 @@ export class BrowserEmotionAnalyzer {
     if (this.ready) return;
     if (this._initializing) return this._initializing;
     this._initializing = (async () => {
-      if (typeof Worker !== 'function' || typeof OffscreenCanvas !== 'function' || typeof createImageBitmap !== 'function') {
+      const initCore = async () => {
         // Older browsers can run the same model on the UI thread at reduced
         // frame rate; there is no change of model or invented fallback result.
-        this._core ||= new BrowserInferenceCore();
-        await this._core.init(onProgress);
+        this._core ||= this._coreFactory();
+        try { await this._core.init(onProgress); }
+        catch (error) { await this._core?.dispose(); this._core = null; throw error; }
+      };
+      if (!this._workerSupported()) {
+        await initCore();
       } else {
-        this._worker = new Worker(local('./inference-worker.js?v=20261028-anatomy'));
-        this._worker.onmessage = ({data}) => {
-          const request = this._pending.get(data.id);
-          if (!request) return;
-          if (data.type === 'progress') { try { request.progress(data.message); } catch {} return; }
-          clearTimeout(request.timer); this._pending.delete(data.id);
-          if (data.type === 'error') request.reject(new Error(data.message)); else request.resolve(data.result);
-        };
-        this._worker.onerror = () => {
-          this.ready = false;
-          this._failPending(new Error('浏览器识别线程未能运行，请刷新或换用新版浏览器'));
+        try {
+          const worker = this._workerFactory(local('./inference-worker.js?v=20261104-mobile-model'));
+          this._worker = worker;
+          worker.onmessage = ({data}) => {
+            if (this._worker !== worker) return;
+            const request = this._pending.get(data.id);
+            if (!request) return;
+            if (data.type === 'progress') { request.keepAlive(); try { request.progress(data.message); } catch {} return; }
+            clearTimeout(request.timer); this._pending.delete(data.id);
+            if (data.type === 'error') request.reject(Object.assign(new Error(data.message), {
+              name: data.name || 'Error', code: data.code, assetDownload: Boolean(data.assetDownload), inferenceRuntime: Boolean(data.inferenceRuntime),
+            })); else request.resolve(data.result);
+          };
+          worker.onerror = () => {
+            if (this._worker !== worker) return;
+            this.ready = false;
+            this._failPending(Object.assign(new Error('浏览器识别线程未能运行'), {code: 'INFERENCE_WORKER_CAPABILITY'}));
+            worker.terminate(); this._worker = null;
+          };
+          await this._request('init', {}, [], onProgress);
+        } catch (error) {
           this._worker?.terminate(); this._worker = null;
-        };
-        try { await this._request('init', {}, [], onProgress); }
-        catch (error) { this._worker?.terminate(); this._worker = null; throw error; }
+          if (this.disposed || error.name === 'AbortError' || error.assetDownload) throw error;
+          // One compatibility fallback only. Network failures retain their
+          // actionable download error instead of restarting the same work.
+          try { onProgress('正在切换到兼容识别模式，模型和识别结果保持一致…'); } catch {}
+          await initCore();
+        }
       }
       if (this.disposed) throw new Error('识别模块已关闭');
       this.ready = true;

@@ -1,5 +1,5 @@
-import {room,attachRoomApp} from './room-session.mjs?v=20261104-tencent';
-import {BrowserEmotionAnalyzer} from './browser-inference.mjs?v=20261028-anatomy';
+import {room,attachRoomApp} from './room-session.mjs?v=20261104-mobile-model';
+import {BrowserEmotionAnalyzer} from './browser-inference.mjs?v=20261104-mobile-model';
 import {LocalSession, EMOTION_KEYS} from './session-state.mjs?v=20261028-gallery192';
 import {CAPTURE_POLICY, CAPTURE_DURATION_LABEL, CaptureWindow} from './capture-window.mjs?v=20261103-auto';
 import {AutoCaptureGate} from './auto-capture.mjs?v=20261103-auto';
@@ -42,7 +42,7 @@ function controls(){
   $('test-file').disabled=testingImage||capturing||submitting;
   $('test-image').disabled=testingImage||capturing||submitting||!$('test-file').files.length;
   $('add-image').disabled=testingImage||submitting||(room.requested&&!room.ready)||!testedImage;
-  $('start-camera').querySelector('span').textContent=state.camera.status==='starting'?'正在准备…':running?'摄像头已开启':'开启摄像头并自动采集';
+  $('start-camera').querySelector('span').textContent=state.camera.status==='starting'?'正在加载识别…':running?'摄像头已开启':state.model.status==='error'?'重新加载并开启摄像头':'开启摄像头并自动采集';
   $('capture-label').textContent=capturing?'正在采集…':cameraRetry?'重试加入作品':'手动再采一次';
   $('test-image').textContent=testingImage?'正在分析…':'分析图片';
 }
@@ -63,10 +63,11 @@ function render(){
   $('camera-placeholder-detail').textContent=state.camera.detail||'照片在你的浏览器内处理，也可以使用下方照片参与';
   const valid=running&&state.live.status==='ok';scoresToRows(liveRows,valid?state.live.scores:{});
   $('top-emotion').textContent=valid?labels[state.live.top_emotion]||'':'';
-  $('live-detail').textContent=state.model.status==='loading'?state.model.detail:state.live.detail||'等待开启摄像头';
+  $('live-detail').textContent=['loading','error'].includes(state.model.status)?state.model.detail:state.live.detail||'等待开启摄像头';
   $('performance').textContent=valid?`浏览器推断 ${Math.round(state.live.inference_ms)} ms`:'';
   $('preview-badge').hidden=!running;$('preview-badge').textContent=valid?'检测到一张人脸':'等待有效人脸';
-  $('capture-detail').textContent=state.capture.detail;$('capture-detail').className=state.capture.status;
+  // Keep model download progress beside the camera on narrow phone screens.
+  $('capture-detail').textContent=['loading','error'].includes(state.model.status)?state.model.detail:state.capture.detail;$('capture-detail').className=state.model.status==='error'?'rejected':state.capture.status;
   $('capture-progress').hidden=!captureRun;$('capture-progress').setAttribute('aria-valuenow',String(Math.round(state.capture.progress*100)));$('capture-progress-fill').style.width=`${state.capture.progress*100}%`;
   $('model-status').textContent=state.model.status==='ready'?(room.active?'enet_b0_8_best_afew · 本地识别 · 同意后共享照片':'enet_b0_8_best_afew · 浏览器 WASM · 照片不上传'):state.model.detail;
   const count=state.session.participant_count;$('participant-count').textContent=`${count} 人`;$('records-empty').hidden=Boolean(count);$('participant-list').hidden=!count;$('group-empty').hidden=Boolean(count);$('group-scores').hidden=!count;scoresToRows(groupRows,state.session.group_scores);
@@ -77,7 +78,7 @@ function render(){
 async function ensureModel(){
   if(state.model.status==='ready')return;
   if(!initPromise){state.model={status:'loading',detail:'正在准备浏览器识别模型…'};render();
-    initPromise=analyzer.init(message=>{if(!disposed){state.model.detail=String(message);render();}}).then(()=>{state.model={status:'ready',detail:'模型就绪'};}).catch(e=>{state.model={status:'error',detail:`识别加载失败：${e.message}。仍可使用情绪联动预览。`};throw e;}).finally(()=>{initPromise=null;render();});}
+    initPromise=analyzer.init(message=>{if(!disposed){state.model.detail=String(message);render();}}).then(()=>{state.model={status:'ready',detail:'模型就绪'};}).catch(e=>{state.model={status:'error',detail:`识别加载失败：${e.message}。请点击“重新加载并开启摄像头”重试，房间会保留。`};throw e;}).finally(()=>{initPromise=null;render();});}
   return initPromise;
 }
 const blobFromCanvas=canvas=>new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('照片生成失败')),'image/jpeg',.94));

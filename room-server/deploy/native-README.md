@@ -63,3 +63,9 @@ Verified 2026-11-04:
 - [Caddy IP certificate support and fixes](https://github.com/caddyserver/caddy/issues/7399).
 
 Local verification covers shell syntax, target-address validation and 13 actual HTTP/SQLite tests, including CLI startup through the release-directory symlink. Target-instance checks verified both systemd services, official binary checksums, a publicly trusted Let's Encrypt certificate for the IP address, authenticated photo and score synchronization, and persistence after restarting both services. Future deployments must repeat the public HTTPS checks; successful startup alone is insufficient.
+
+## Optional inference download route
+
+`sudo bash room-server/deploy/install-inference-assets.sh` adds a read-only `/inference-assets/` route to the same HTTPS listener. It downloads the pinned public MediaPipe/ONNX runtime files and MediaPipe face task, verifies their SHA-256 checksums, and preserves licenses and source metadata. The fixed emotion-classifier URL is streamed from the original author through a no-store proxy; classifier weights are not packaged in the repository or saved on the server. Client photographs and room tokens do not enter these routes.
+
+Only named assets and GET/HEAD/OPTIONS are accepted. CORS names the existing GitHub Pages origin. The installer backs up Caddy configuration, validates before reload, and rolls back if reload or local HTTPS health fails. It does not restart Node, alter SQLite, change TLS/ACME setup, open ports, or add paid resources. The native templates retain the optional `conf.d/*.caddy` import on future installs. After deployment, verify the public asset response headers, checksum, and successful browser initialization; this script cannot verify iPhone Safari by itself.

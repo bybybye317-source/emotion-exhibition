@@ -8,6 +8,7 @@
 
 {$ROOM_DOMAIN} {
     # Keep access logging off: requests can contain room capability credentials.
+    import /etc/empathy-classroom/conf.d/*.caddy
     @room_api path /api/*
     handle @room_api {
         reverse_proxy 127.0.0.1:8787 {

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {BrowserEmotionAnalyzer, CLASS_ORDER, MODEL_SOURCE, preprocessRgba, scoresFromLogits, alignmentAnchors, sharpnessVariance} from '../static/browser-inference.mjs';
+import {BrowserEmotionAnalyzer, CLASS_ORDER, MODEL_SOURCE, preprocessRgba, scoresFromLogits, alignmentAnchors, sharpnessVariance,
+  inferenceWorkerSupported, assertWorkerGraphics, initializationDeadline, inferenceProgressText} from '../static/browser-inference.mjs';
 
 test('RGB normalization writes NCHW planes and excludes alpha', () => {
   const data = preprocessRgba(new Uint8ClampedArray([255, 0, 128, 0, 0, 255, 64, 255]), 2, 1);
@@ -111,4 +112,91 @@ test('eye and eyebrow anchors keep complete local features in image coordinates'
  assert.deepEqual(a.right_eye_outer,[.8,.3]);assert.deepEqual(a.right_eye_inner,[.6,.3]);
  assert.deepEqual(a.left_eye_upper,[.3,.27]);assert.deepEqual(a.right_eye_lower,[.7,.34]);
  assert.deepEqual(a.left_brow_middle,[.3,.18]);assert.deepEqual(a.right_brow_outer,[.79,.2]);
+});
+
+test('Safari canvas compatibility follows the bundled MediaPipe requirements', () => {
+  const scope = {Worker() {}, OffscreenCanvas() {}, createImageBitmap() {}, navigator: {userAgent: ''}};
+  assert.equal(inferenceWorkerSupported(scope), true);
+  scope.navigator.userAgent = 'Mozilla/5.0 Version/16.6 Mobile/15E148 Safari/604.1';
+  assert.equal(inferenceWorkerSupported(scope), false);
+  scope.navigator.userAgent = 'Mozilla/5.0 Version/18.4 Mobile/15E148 Safari/604.1';
+  assert.equal(inferenceWorkerSupported(scope), true);
+  scope.navigator.userAgent = 'Mozilla/5.0 CriOS/141 Mobile/15E148 Safari/604.1';
+  assert.equal(inferenceWorkerSupported(scope), false);
+  scope.navigator.userAgent = 'Mozilla/5.0 Chrome/141 Safari/537.36';
+  assert.equal(inferenceWorkerSupported(scope), true);
+});
+
+test('worker graphics probe rejects 2D-only OffscreenCanvas before downloading models', () => {
+  assert.throws(() => assertWorkerGraphics({OffscreenCanvas: class {getContext() {return null;}}}), /后台图形/);
+  let released = false;
+  assertWorkerGraphics({OffscreenCanvas: class {getContext() {return {getExtension() {return {loseContext() {released = true;}};}};}}});
+  assert.equal(released, true);
+});
+
+test('initialization deadline rejects a stalled runtime and closes its late instance', async () => {
+  let complete, released = 0;
+  const runtime = new Promise(resolve => {complete = resolve;});
+  await assert.rejects(initializationDeadline(runtime, {label: '人脸定位', timeoutMs: 5, disposeLate: value => value.close()}), /初始化超时/);
+  complete({close() {released++;}});
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(released, 1);
+});
+
+test('cancellation rejects initialization and never revives a late model', async () => {
+  let complete, released = 0;
+  const controller = new AbortController();
+  const runtime = new Promise(resolve => {complete = resolve;});
+  const pending = initializationDeadline(runtime, {signal: controller.signal, disposeLate: () => {released++;}});
+  controller.abort();
+  await assert.rejects(pending, {name: 'AbortError'});
+  complete({});
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(released, 1);
+});
+
+test('worker capability failure falls back once to the same model core', async () => {
+  const env = fakeWorkerEnvironment(); let initialized = 0, disposed = 0;
+  const core = {async init(progress) {initialized++; progress('模型就绪');}, async dispose() {disposed++;}, async analyze() {return {status: 'no_face'};}};
+  const analyzer = new BrowserEmotionAnalyzer({coreFactory: () => core});
+  try {
+    const pending = analyzer.init();
+    const worker = env.workers[0];
+    worker.onmessage({data: {id: worker.messages[0].id, type: 'error', message: '无 WebGL', code: 'INFERENCE_WORKER_CAPABILITY'}});
+    await pending;
+    assert.equal(worker.terminated, true); assert.equal(analyzer.ready, true); assert.equal(initialized, 1);
+    assert.deepEqual(await analyzer.analyze({}), {status: 'no_face'});
+    await analyzer.dispose(); assert.equal(disposed, 1);
+  } finally {env.restore();}
+});
+
+test('download error is actionable and retryable without redundant compatibility fallback', async () => {
+  const env = fakeWorkerEnvironment(); let fallback = 0;
+  const analyzer = new BrowserEmotionAnalyzer({coreFactory: () => {fallback++; throw new Error('unexpected fallback');}});
+  try {
+    const pending = analyzer.init(); const worker = env.workers[0];
+    worker.onmessage({data: {id: worker.messages[0].id, type: 'error', message: '下载超时', name: 'TimeoutError', assetDownload: true}});
+    await assert.rejects(pending, /下载超时/); assert.equal(fallback, 0); assert.equal(worker.terminated, true);
+    const retry = analyzer.init(); const next = env.workers[1]; next.respond(next.messages[0], {ready: true});
+    await retry; assert.equal(analyzer.ready, true);
+  } finally {await analyzer.dispose(); env.restore();}
+});
+
+test('silent worker cannot leave initialization pending and late messages are ignored', async () => {
+  const env = fakeWorkerEnvironment(); let initialized = 0;
+  const analyzer = new BrowserEmotionAnalyzer({initIdleTimeoutMs: 5, coreFactory: () => ({
+    async init() {initialized++;}, async dispose() {}, async analyze() {return {status: 'no_face'};},
+  })});
+  try {
+    const pending = analyzer.init(); const stale = env.workers[0];
+    await pending;
+    assert.equal(initialized, 1); assert.equal(stale.terminated, true); assert.equal(analyzer._pending.size, 0);
+    stale.respond(stale.messages[0], {ready: true});
+    assert.equal(analyzer._worker, null); assert.equal(analyzer.ready, true);
+  } finally {await analyzer.dispose(); env.restore();}
+});
+
+test('download progress reports bytes, percentage and retry state', () => {
+  assert.match(inferenceProgressText({label: '人脸模型', phase: 'download', loaded: 1048576, total: 4194304, percent: 25}), /1\.0 \/ 4\.0 MB · 25%/);
+  assert.match(inferenceProgressText({label: '人脸模型', phase: 'retry'}), /重试下载/);
 });

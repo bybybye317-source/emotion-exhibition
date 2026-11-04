@@ -8,7 +8,8 @@ self.onmessage = async ({data}) => {
   try {
     if (type === 'init') {
       if (!initializing) initializing = (async () => {
-        const {BrowserInferenceCore} = await import('./browser-inference.mjs?v=20261028-anatomy');
+        const {BrowserInferenceCore, assertWorkerGraphics} = await import('./browser-inference.mjs?v=20261104-mobile-model');
+        assertWorkerGraphics();
         analyzer = new BrowserInferenceCore();
         await analyzer.init(message => self.postMessage({id, type: 'progress', message}));
       })();
@@ -24,7 +25,8 @@ self.onmessage = async ({data}) => {
       self.postMessage({id, type: 'result', result});
     } else throw new Error('不支持的识别操作');
   } catch (error) {
-    self.postMessage({id, type: 'error', message: error?.message || '识别失败'});
+    self.postMessage({id, type: 'error', message: error?.message || '识别失败', name: error?.name,
+      code: error?.code, assetDownload: Boolean(error?.assetDownload), inferenceRuntime: Boolean(error?.inferenceRuntime)});
   } finally {
     data.image?.close();
   }

@@ -1,13 +1,13 @@
 # 浏览器识别组件与模型来源
 
-核验日期：2026-10-26。所有图像处理和推断都在访问者自己的浏览器内执行；没有上传图像或分数的 API。
+更新日期：2026-11-04。图像处理和推断在访问者自己的浏览器内执行。个人模式不上传；共享讲台在观众同意后上传照片、分数与配准数据。以下模型下载请求不携带照片或房间凭据。
 
 ## 表情分类模型：原作者地址下载，不随本站分发权重
 
 - EmotiEffLib `enet_b0_8_best_afew.onnx`，来源提交 `520a051c64cd191521e5934655314e769a319684`。
 - [原始下载地址](https://raw.githubusercontent.com/sb-ai-lab/EmotiEffLib/520a051c64cd191521e5934655314e769a319684/models/affectnet_emotions/onnx/enet_b0_8_best_afew.onnx)
 - 大小 16,039,595 字节，SHA256 `7aa2ea31c1311f4f8aa9d3fdb085d418dd4e7a48c4b9ed41df8c044f91d0213f`。
-- 首次初始化时，浏览器从上述原始地址下载并检查大小及 SHA256，再传给本地 WASM。该请求只下载模型，不携带用户图像。原地址不可访问时会明确报错；三板块情绪预览仍可用。
+- 首次初始化时，浏览器通过 `https://43.161.198.80/inference-assets/classifier.onnx` 固定地址中继、上述原作者地址、或同一提交的 jsDelivr 镜像择优下载，并检查大小及 SHA256，再传给本地 WASM。中继不保存权重到磁盘，不接受客户端指定上游地址；三个来源的大小和 SHA256 必须一致；大文件比较首段 256 KiB 吞吐，保留最快的流继续下载并中止其余请求。该请求只下载模型，不携带用户图像。原地址不可访问时会明确报错；三板块情绪预览仍可用。
 - [作者 README](https://github.com/sb-ai-lab/EmotiEffLib/tree/520a051c64cd191521e5934655314e769a319684) 的 License 段明确将“code”授权为 Apache-2.0，未单独说明权重许可。因此本仓库不重新分发 ONNX 权重，也不将这些权重重新授权。`LICENSE-EMOTIEFFLIB-CODE` 仅为原代码许可证记录。
 - 研究引用：Andrey Savchenko, *Facial Expression Recognition with Adaptive Frame Rate based on Multiple Testing Correction*, ICML 2023, https://proceedings.mlr.press/v202/savchenko23a.html。
 
@@ -45,3 +45,5 @@ await analyzer.dispose();
 支持 Worker、OffscreenCanvas 和 createImageBitmap 的浏览器在独立 Worker 中串行推断，避免阻塞音乐调度与三维界面。摄像头末帧与图片测试若同时到达，会依次处理；图像位图在完成后释放。缺少这些能力的旧浏览器使用同一模型在主线程运行，调用方应降低采样频率并避免并发分析。低性能设备首次加载和推断可能更慢，运行错误不会悄悄降级成伪造情绪。
 
 已在 Chromium 141 验证普通 HTTP 子路径且 `crossOriginIsolated=false` 的独立 Worker 路径：公共 Google portrait 测试图得到 happiness 为最大项，空白图不输出分数，双人图拒绝分类。测试素材只保存在系统临时目录，不包含在网站中。
+
+2026-11-04：公共运行组件和人脸定位模型同时由现有腾讯云服务按固定白名单提供，保留上游许可与哈希校验。下载显示字节进度，具有空闲/整体超时、一次重试和备用源。Worker 启动前探测 WebGL；不兼容时回退到 HTMLCanvas 主线程路径。权重版本、类别顺序、预处理和质量检查不变。

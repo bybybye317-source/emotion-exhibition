@@ -1,0 +1,32 @@
+{
+    admin unix//run/empathy-classroom-https/admin.sock
+    # IP clients normally send no SNI. On a NAT'd cloud instance the local
+    # socket address is private, so use the explicitly configured public IP.
+    default_sni {$ROOM_DOMAIN}
+    servers {
+        protocols h1 h2
+    }
+}
+
+https://{$ROOM_DOMAIN} {
+    # Explicit public CA only: never fall back to Caddy's local/self-signed CA.
+    tls {
+        issuer acme {
+            dir https://acme-v02.api.letsencrypt.org/directory
+            profile shortlived
+            # Validate on TCP 80; HTTPS exposure can be approved separately.
+            disable_tlsalpn_challenge
+        }
+    }
+    @room_api path /api/*
+    handle @room_api {
+        reverse_proxy 127.0.0.1:8787 {
+            header_up X-Real-IP {remote_host}
+            header_up -CF-Connecting-IP
+            header_up -X-Forwarded-For
+        }
+    }
+    handle {
+        respond "Empathy Gallery room service" 200
+    }
+}

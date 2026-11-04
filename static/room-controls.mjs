@@ -1,7 +1,7 @@
-import {RoomClient, DEFAULT_ROOM_API} from './room-client.mjs?v=20261104-quick-qr';
-import {createRoomInvitation, parseRoomInvitation, ROOM_ENTRY_VERSION} from './room-invitation.mjs?v=20261104-quick-qr';
-import {roomLifetime, shouldAutoCreateHost} from './room-lifetime.mjs?v=20261104-quick-qr';
-import {readHostSession,writeHostSession,forgetHostSession} from './room-host-storage.mjs?v=20261104-relay';
+import {RoomClient, DEFAULT_ROOM_API} from './room-client.mjs?v=20261104-tencent';
+import {createRoomInvitation, parseRoomInvitation, ROOM_ENTRY_VERSION} from './room-invitation.mjs?v=20261104-tencent';
+import {roomLifetime, shouldAutoCreateHost} from './room-lifetime.mjs?v=20261104-tencent';
+import {readHostSession,writeHostSession,forgetHostSession} from './room-host-storage.mjs?v=20261104-tencent';
 import qrcode from './vendor/qrcode-generator.mjs';
 export const ROOM_API=DEFAULT_ROOM_API;
 export function createRoomControls({onState=()=>{},onError=()=>{},isBusy=()=>false}={}){

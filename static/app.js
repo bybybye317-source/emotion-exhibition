@@ -1,4 +1,4 @@
-import {room,attachRoomApp} from './room-session.mjs?v=20261104-quick-qr';
+import {room,attachRoomApp} from './room-session.mjs?v=20261104-tencent';
 import {BrowserEmotionAnalyzer} from './browser-inference.mjs?v=20261028-anatomy';
 import {LocalSession, EMOTION_KEYS} from './session-state.mjs?v=20261028-gallery192';
 import {CAPTURE_POLICY, CAPTURE_DURATION_LABEL, CaptureWindow} from './capture-window.mjs?v=20261103-auto';

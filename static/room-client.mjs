@@ -1,6 +1,6 @@
 // Classroom transport. Photo upload happens only after explicit consent in submit().
 // Credentials are held in memory; UI owns optional sessionStorage and fragment links.
-export const DEFAULT_ROOM_API='https://empathy-gallery-classroom.bybybye317.chatgpt.site';
+export const DEFAULT_ROOM_API='https://43.161.198.80';
 export class RoomError extends Error {constructor(message,status,{invalidatesRoom=false,serviceResponse=false,retryable=false,code}={}){super(message);this.status=status;this.invalidatesRoom=invalidatesRoom;this.serviceResponse=serviceResponse;this.retryable=retryable;this.code=code;}}
 // These are the relay's room-auth/expiry responses. A gateway can return the same
 // HTTP status, so status alone must never discard a connected room's credentials.

@@ -4,7 +4,7 @@ import {request as httpRequest} from 'node:http';
 import {spawn} from 'node:child_process';
 import {once} from 'node:events';
 import {DatabaseSync} from 'node:sqlite';
-import {mkdtemp,rm,stat} from 'node:fs/promises';
+import {mkdtemp,rm,stat,symlink} from 'node:fs/promises';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {tmpdir} from 'node:os';
@@ -117,6 +117,36 @@ test('the CLI handles SIGTERM and a fresh Node process restores the same room', 
  const room=await response.json();assert.deepEqual(await stop(first.child),[0,null]);
  const second=await start();const restored=await fetch(second.base+'/api/rooms/'+room.roomId,{headers:{Origin:ORIGIN,Authorization:'Bearer '+room.joinToken}});
  assert.equal(restored.status,200);assert.equal((await restored.json()).expiresAt,room.expiresAt);assert.deepEqual(await stop(second.child),[0,null]);
+});
+
+test('the CLI starts through a release-directory symlink and serves SQLite health', {timeout:10000},async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'empathy-node-symlink-')),entry=join(directory,'current','node-server.mjs');
+ await symlink(fileURLToPath(new URL('.',import.meta.url)),join(directory,'current'),'dir');
+ const child=spawn(process.execPath,[entry],{cwd:directory,env:{ROOM_DB_PATH:join(directory,'classroom.sqlite'),ROOM_HOST:'127.0.0.1',PORT:'0',ROOM_ALLOWED_ORIGINS:ORIGIN},stdio:['ignore','pipe','pipe']});
+ t.after(async()=>{
+  if(child.exitCode===null&&child.signalCode===null){const exited=once(child,'exit');child.kill('SIGKILL');await exited;}
+  await rm(directory,{recursive:true,force:true});
+ });
+ const base=await new Promise((resolveBase,reject)=>{
+  let output='';const timer=setTimeout(()=>reject(new Error('Symlink CLI did not start')),3000);timer.unref();
+  child.once('error',error=>{clearTimeout(timer);reject(error);});
+  child.once('exit',()=>{clearTimeout(timer);reject(new Error('Symlink CLI exited before listening'));});
+  child.stderr.resume();
+  child.stdout.on('data',chunk=>{output=(output+chunk).slice(-1000);const match=output.match(/Listening on 127\.0\.0\.1:(\d+)/);if(match){clearTimeout(timer);resolveBase('http://127.0.0.1:'+match[1]);}});
+ });
+ const health=await fetch(base+'/api/health',{headers:{Origin:ORIGIN}});
+ assert.equal(health.status,200);
+ assert.deepEqual(await health.json(),{ok:true,storage:'sqlite',roomTtlSeconds:18000});
+ const exited=once(child,'exit');child.kill('SIGTERM');assert.deepEqual(await exited,[0,null]);
+});
+
+test('importing the server with absent or non-file argv does not start a listener', {timeout:10000},async()=>{
+ for(const argv of [undefined,'/nonexistent/empathy-node-cli-entry']){
+  const script=`process.argv[1]=${JSON.stringify(argv)??'undefined'};await import(${JSON.stringify(new URL('./node-server.mjs',import.meta.url).href)});console.log('import-only');`;
+  const child=spawn(process.execPath,['--input-type=module','-e',script],{env:{ROOM_DB_PATH:'/nonexistent/empathy-import-must-not-create.sqlite'},stdio:['ignore','pipe','pipe']});
+  let output='';child.stdout.on('data',chunk=>{output+=chunk;});child.stderr.resume();
+  assert.deepEqual(await once(child,'exit'),[0,null]);assert.equal(output.trim(),'import-only');
+ }
 });
 
 test('HTTP expiry is exactly five hours, is unchanged by restart, and scheduled cleanup removes expired photos',async t=>{

@@ -1,7 +1,8 @@
 import {createServer as createHttpServer} from 'node:http';
 import {isIP} from 'node:net';
+import {realpathSync} from 'node:fs';
 import {resolve} from 'node:path';
-import {pathToFileURL} from 'node:url';
+import {fileURLToPath} from 'node:url';
 import {handleRequest,MAX_BODY_BYTES,ROOM_TTL_MS} from './core.mjs';
 import {D1RoomStore} from './d1-store.mjs';
 import {openRoomDatabase} from './sqlite-store.mjs';
@@ -160,7 +161,15 @@ export function optionsFromEnv(env=process.env){
   trustLoopbackProxy:env.ROOM_TRUST_LOOPBACK_PROXY!=='0',
  };
 }
-if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
+function isCliEntry(){
+ if(!process.argv[1])return false;
+ try{
+  // Release deployments invoke /opt/.../current/node-server.mjs through a
+  // symlink, while Node normally resolves import.meta.url to the real file.
+  return realpathSync(resolve(process.argv[1]))===realpathSync(fileURLToPath(import.meta.url));
+ }catch{return false;} // Imports from eval/REPL or a missing argv path stay inert.
+}
+if(isCliEntry()){
  let relay;
  try{
   relay=createServer(optionsFromEnv());const address=await relay.listen();

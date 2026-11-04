@@ -1,0 +1,22 @@
+{
+    # The admin API is available only through this private, service-owned socket.
+    admin unix//run/empathy-classroom-https/admin.sock
+    servers {
+        protocols h1 h2
+    }
+}
+
+{$ROOM_DOMAIN} {
+    # Keep access logging off: requests can contain room capability credentials.
+    @room_api path /api/*
+    handle @room_api {
+        reverse_proxy 127.0.0.1:8787 {
+            header_up X-Real-IP {remote_host}
+            header_up -CF-Connecting-IP
+            header_up -X-Forwarded-For
+        }
+    }
+    handle {
+        respond "Empathy Gallery room service" 200
+    }
+}

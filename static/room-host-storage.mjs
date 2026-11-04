@@ -1,4 +1,4 @@
-import {validHostSession} from './room-lifetime.mjs?v=20261104-quick-qr';
+import {validHostSession} from './room-lifetime.mjs?v=20261104-tencent';
 
 const PREFIX='empathy-classroom-host-v2:';
 const LEGACY_KEY='empathy-classroom-host-v1';

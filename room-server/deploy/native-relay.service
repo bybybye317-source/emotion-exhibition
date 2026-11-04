@@ -1,0 +1,38 @@
+# Managed by the Empathy Gallery native installer.
+[Unit]
+Description=Empathy Gallery shared classroom relay
+After=network.target
+StartLimitIntervalSec=120
+StartLimitBurst=6
+
+[Service]
+Type=simple
+User=empathy-classroom
+Group=empathy-classroom
+WorkingDirectory=/opt/empathy-classroom/current
+EnvironmentFile=/etc/empathy-classroom/room.env
+ExecStart=/opt/empathy-classroom/runtime/node-v24.22.2-linux-x64/bin/node /opt/empathy-classroom/current/node-server.mjs
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+StateDirectory=empathy-classroom
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+LockPersonality=true
+LimitNOFILE=4096
+TasksMax=64
+MemoryHigh=256M
+MemoryMax=384M
+
+[Install]
+WantedBy=multi-user.target
